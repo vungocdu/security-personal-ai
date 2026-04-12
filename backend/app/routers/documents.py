@@ -48,6 +48,7 @@ async def list_documents(
 )
 async def upload_document(
     file: UploadFile = File(...),
+    document_id: str | None = Form(default=None),
     document_type: str | None = Form(default=None),
     ticker: str | None = Form(default=None),
     company_name: str | None = Form(default=None),
@@ -56,6 +57,7 @@ async def upload_document(
 ) -> DocumentAcceptedResponse:
     return service.upload_document(
         filename=file.filename or "uploaded-document",
+        document_id=document_id,
         document_type=document_type,
         ticker=ticker,
         company_name=company_name,

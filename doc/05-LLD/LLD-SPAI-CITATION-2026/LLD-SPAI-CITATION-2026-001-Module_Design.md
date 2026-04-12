@@ -6,7 +6,7 @@
 | --- | --- |
 | **Document ID** | LLD-SPAI-CITATION-2026-001 |
 | **Template Version** | 1.0 |
-| **Document Version** | 1.0 |
+| **Document Version** | 1.1 |
 | **Project / Product** | Security Personal AI |
 | **Module / Component** | Citation Preview and Source Verification |
 | **Author** | OpenAI Codex, AI Implementation Draft |
@@ -38,6 +38,8 @@
 
 - **Business Rules:**
   - Citation bat buoc co `document_id`, `document_version_id`, `chunk_id`, `version_label`.
+  - Preview resolver phai xac thuc `document_version_id` thuoc `document_id` truoc khi tra URL.
+  - Neu version ton tai nhung chua o trang thai co the preview (`accepted`, `indexing`, `failed`) thi phai tra `409 preview_not_ready`.
   - Neu co preview thi phai tra `preview_url`; neu khong co phai tra `409 PreviewNotReady` hoac field nullable tuy endpoint.
   - `viewer_anchor` duoc dung de scroll/highlight page/chunk trong viewer.
 - **State Management:** Citation la read-only lookup; preview resource co TTL thong qua `expires_at`.
@@ -78,7 +80,7 @@
 
 ## 8. ERROR HANDLING & RESILIENCE
 
-- **Failure Modes:** preview artifact missing, expired signed URL, citation mapping stale.
+- **Failure Modes:** preview artifact missing, expired signed URL, citation mapping stale, document/version mismatch.
 - **Fallbacks / Retries:** frontend co the re-request preview endpoint de lay signed URL moi; citation detail van hien snippet neu preview chua san sang.
 - **Idempotency:** GET endpoints read-only.
 - **Monitoring Hooks:** log preview_resolved, preview_not_ready, citation_not_found.
@@ -124,4 +126,5 @@
 
 | Version | Date | Description | Author | Reviewer | Approved By |
 | --- | --- | --- | --- | --- | --- |
+| 1.1 | 2026-04-12 | Added strict version-to-document validation and preview-not-ready semantics | OpenAI Codex | Pending | Pending |
 | 1.0 | 2026-04-12 | Initial release | OpenAI Codex | Pending | Pending |

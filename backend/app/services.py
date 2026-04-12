@@ -13,6 +13,7 @@ from app.schemas import (
     DocumentResource,
     DocumentVersionCollection,
     FilterObject,
+    ParseStatus,
     PreviewResource,
     QueryRequest,
     QueryResponse,
@@ -64,14 +65,18 @@ class DocumentService:
         self,
         *,
         filename: str,
+        document_id: str | None,
         document_type: str | None,
         ticker: str | None,
         company_name: str | None,
         publication_date: date | None,
         source: str | None,
     ) -> DocumentAcceptedResponse:
+        if document_id and fixture_repository.get_document(document_id) is None:
+            raise not_found("document_not_found", f"Document '{document_id}' was not found.")
         return fixture_repository.upload_document(
             filename=filename,
+            document_id=document_id,
             document_type=document_type,
             ticker=ticker,
             company_name=company_name,
@@ -92,6 +97,17 @@ class DocumentService:
         return versions
 
     def get_preview(self, document_id: str, version_id: str, page_number: int) -> PreviewResource:
+        versions = fixture_repository.list_versions(document_id)
+        if versions is None:
+            raise not_found("document_not_found", f"Document '{document_id}' was not found.")
+        target_version = next((item for item in versions.data if item.document_version_id == version_id), None)
+        if target_version is None:
+            raise not_found("version_not_found", f"Version '{version_id}' was not found for document '{document_id}'.")
+        if target_version.parse_status in {ParseStatus.accepted, ParseStatus.indexing, ParseStatus.failed}:
+            raise conflict("preview_not_ready", f"Preview for version '{version_id}' is not ready.")
+        if target_version.parse_status in {ParseStatus.withdrawn, ParseStatus.invalidated}:
+            raise not_found("preview_not_found", f"Preview for version '{version_id}' is not available.")
+
         preview = fixture_repository.get_preview(document_id, version_id, page_number)
         if preview is None:
             raise not_found("preview_not_found", f"Preview for document '{document_id}' was not found.")
@@ -110,5 +126,12 @@ class CitationService:
 def not_found(code: str, message: str) -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
+        detail={"code": code, "message": message},
+    )
+
+
+def conflict(code: str, message: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
         detail={"code": code, "message": message},
     )

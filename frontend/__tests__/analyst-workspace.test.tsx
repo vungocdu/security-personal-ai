@@ -49,4 +49,20 @@ describe("AnalystWorkspace", () => {
     expect(screen.getByLabelText("Open left panel")).toBeInTheDocument();
     expect(screen.getByLabelText("Open right panel")).toBeInTheDocument();
   });
+
+  it("uploads into selected logical document as a new version", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<AnalystWorkspace />);
+    await waitFor(() => expect(screen.getByText("Document tree")).toBeInTheDocument());
+
+    await user.click(screen.getByRole("button", { name: /HPG Annual Report 2024/i }));
+
+    const uploadInput = container.querySelector('input[type="file"]');
+    expect(uploadInput).not.toBeNull();
+    await user.upload(uploadInput as HTMLInputElement, new File(["fixture"], "hpg-amended.pdf", { type: "application/pdf" }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Appended version: doc_hpg_ar_2024 -> docver_hpg_ar_2024_v99/i)).toBeInTheDocument();
+    });
+  });
 });

@@ -246,12 +246,25 @@ class FixtureRepository:
         self,
         *,
         filename: str,
+        document_id: str | None = None,
         document_type: str | None = None,
         ticker: str | None = None,
         company_name: str | None = None,
         publication_date: date | None = None,
         source: str | None = None,
     ) -> DocumentAcceptedResponse:
+        if document_id:
+            document_index = self._find_document_index(document_id)
+            if document_index is None:
+                raise ValueError(f"Unknown document_id '{document_id}'")
+            return self._append_document_version(
+                document_index=document_index,
+                document_type=document_type,
+                ticker=ticker,
+                publication_date=publication_date,
+                source=source,
+            )
+
         base = ticker.lower() if ticker else "uploaded"
         doc_id = f"doc_{base}_{len(self._documents) + 1:03d}"
         version_id = f"docver_{base}_{len(self._documents) + 1:03d}_v1"
@@ -285,6 +298,65 @@ class FixtureRepository:
             index_job_id=f"job_{len(self._documents) + 7700}",
         )
 
+    def _find_document_index(self, document_id: str) -> int | None:
+        for index, document in enumerate(self._documents):
+            if document.document_id == document_id:
+                return index
+        return None
+
+    def _append_document_version(
+        self,
+        *,
+        document_index: int,
+        document_type: str | None,
+        ticker: str | None,
+        publication_date: date | None,
+        source: str | None,
+    ) -> DocumentAcceptedResponse:
+        document = self._documents[document_index]
+        versions = self._versions[document.document_id]
+        current_version = next((version for version in versions if version.is_current_version), None)
+        if current_version is None:
+            raise ValueError(f"Document '{document.document_id}' has no current version.")
+
+        current_version.is_current_version = False
+        current_version.parse_status = ParseStatus.superseded
+
+        next_version_number = len(versions) + 1
+        base_version_id = current_version.document_version_id
+        if "_v" in base_version_id:
+            base_version_id = base_version_id.rsplit("_v", maxsplit=1)[0]
+        new_version_id = f"{base_version_id}_v{next_version_number}"
+        published_on = publication_date or date.today()
+
+        versions.append(
+            DocumentVersionResource(
+                document_id=document.document_id,
+                document_version_id=new_version_id,
+                version_label=f"v{next_version_number}",
+                is_current_version=True,
+                supersedes_version_id=current_version.document_version_id,
+                publication_date=published_on,
+                parse_status=ParseStatus.accepted,
+            )
+        )
+
+        document.current_version_id = new_version_id
+        document.publication_date = published_on
+        document.index_status = ParseStatus.accepted
+        if ticker:
+            document.ticker = ticker
+        if document_type:
+            document.document_type = DocumentType(document_type)
+        if source:
+            document.source = source
+
+        return DocumentAcceptedResponse(
+            document_id=document.document_id,
+            document_version_id=new_version_id,
+            index_job_id=f"job_{len(self._documents) + 7700 + len(versions)}",
+        )
+
     def get_citation(self, citation_id: str) -> CitationResource | None:
         citation = self._citations.get(citation_id)
         return deepcopy(citation) if citation else None
@@ -292,6 +364,9 @@ class FixtureRepository:
     def get_preview(self, document_id: str, version_id: str, page_number: int) -> PreviewResource | None:
         document = self.get_document(document_id)
         if document is None:
+            return None
+        versions = self._versions.get(document_id)
+        if versions is None or not any(item.document_version_id == version_id for item in versions):
             return None
         mime_type = "application/pdf"
         if document.document_type == DocumentType.research_report:

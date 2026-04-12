@@ -79,6 +79,42 @@ def test_document_upload_returns_accepted_payload() -> None:
     assert payload["document_version_id"].startswith("docver_")
 
 
+def test_document_upload_with_document_id_appends_new_version() -> None:
+    before = client.get("/api/v1/documents/doc_hpg_ar_2024")
+    assert before.status_code == 200
+    previous_current_version = before.json()["current_version_id"]
+
+    response = client.post(
+        "/api/v1/documents",
+        files={"file": ("hpg-ar-amended.pdf", BytesIO(b"fake-pdf"), "application/pdf")},
+        data={"document_id": "doc_hpg_ar_2024", "publication_date": "2025-04-01"},
+    )
+    assert response.status_code == 202
+    payload = response.json()
+    assert payload["document_id"] == "doc_hpg_ar_2024"
+    assert payload["document_version_id"] != previous_current_version
+
+    versions_response = client.get("/api/v1/documents/doc_hpg_ar_2024/versions")
+    assert versions_response.status_code == 200
+    versions = versions_response.json()["data"]
+    latest = next(item for item in versions if item["is_current_version"] is True)
+    superseded = next(item for item in versions if item["document_version_id"] == previous_current_version)
+    assert latest["document_version_id"] == payload["document_version_id"]
+    assert latest["parse_status"] == "accepted"
+    assert superseded["parse_status"] == "superseded"
+
+
+def test_document_upload_with_unknown_document_id_returns_not_found() -> None:
+    response = client.post(
+        "/api/v1/documents",
+        files={"file": ("missing-target.pdf", BytesIO(b"fake-pdf"), "application/pdf")},
+        data={"document_id": "doc_missing"},
+    )
+    assert response.status_code == 404
+    payload = response.json()
+    assert payload["error"]["code"] == "document_not_found"
+
+
 def test_citation_and_preview_endpoints_support_evidence_panel() -> None:
     citation = client.get("/api/v1/citations/cit_hpg_risk_001")
     assert citation.status_code == 200
@@ -91,6 +127,13 @@ def test_citation_and_preview_endpoints_support_evidence_panel() -> None:
     assert preview.status_code == 200
     preview_payload = preview.json()
     assert preview_payload["preview_url"].startswith("https://signed.example.com")
+
+
+def test_preview_returns_not_ready_for_non_indexed_version() -> None:
+    response = client.get("/api/v1/documents/doc_fpt_fin_2024q4/versions/docver_fpt_fin_2024q4_v1/preview/3")
+    assert response.status_code == 409
+    payload = response.json()
+    assert payload["error"]["code"] == "preview_not_ready"
 
 
 def test_missing_document_returns_not_found_envelope() -> None:

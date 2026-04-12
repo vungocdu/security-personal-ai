@@ -6,7 +6,7 @@
 | --- | --- |
 | **Document ID** | LLD-SPAI-FRONTEND-2026-001 |
 | **Template Version** | 1.0 |
-| **Document Version** | 1.0 |
+| **Document Version** | 1.1 |
 | **Project / Product** | Security Personal AI |
 | **Module / Component** | Analyst Workspace Frontend |
 | **Author** | OpenAI Codex, AI Implementation Draft |
@@ -33,6 +33,7 @@
 | Capability | Description | Trigger | Output | Related Requirements |
 | --- | --- | --- | --- | --- |
 | Repository panel | Hien folder tree, upload, status | app load / upload | document tree | BR-FN-001 |
+| Version-aware upload | Upload file vao document dang chon de tao version moi | upload khi da chon document | append version status + refresh tree | BR-FN-001, BR-FN-007 |
 | Query workspace | Nhap query, filters, xem answer | user submit | answer cards | BR-FN-003, BR-FN-004 |
 | Evidence panel | Hien snippets va preview | click citation/result | synced right panel | BR-FN-007 |
 | Voice draft | Ghi am co ban va do transcript vao composer | mic action | draft text | deferred-lite UX |
@@ -40,6 +41,7 @@
 
 - **Business Rules:**
   - Cột giữa la primary focus.
+  - Neu user da chon document trong repository panel, upload action phai gui `document_id` de append version.
   - Click citation phai dong bo evidence item va preview target.
   - Left/right panels khong duoc chan luong query.
   - Empty/loading/error states phai ro thay vi de blank UI.
@@ -70,6 +72,7 @@
   - `WorkspaceApi.search()`
   - `WorkspaceApi.getCitation()`
   - `WorkspaceApi.getPreview()`
+  - `WorkspaceApi.uploadDocument(file, documentId?)`
 
 ## 6. INTERFACES & CONTRACTS
 
@@ -81,7 +84,7 @@
 | Preview load | Preview viewer | API client | HTTP/JSON | `PreviewResource` | signed URL aware |
 
 - **Backward Compatibility:** Frontend view-model phai co adapter layer neu backend them field optional.
-- **Error Models:** loading error, empty state, preview-not-ready state, upload validation state.
+- **Error Models:** loading error, empty state, preview-not-ready state, upload validation state, append-version target not found state.
 
 ## 7. DATA DESIGN
 
@@ -121,7 +124,7 @@
 
 ## 12. VERIFICATION & TESTABILITY
 
-- **Unit Tests:** render 3 cot, upload CTA, query flow, citation sync, preview fallback, responsive drawers.
+- **Unit Tests:** render 3 cot, upload CTA, upload-to-selected-document flow, query flow, citation sync, preview fallback, responsive drawers.
 - **Integration Tests:** mocked API responses qua MSW hoac fetch mocks.
 - **Performance Tests:** khong bat buoc; smoke build/test du.
 - **Security Tests:** safe preview URL handling, no dangerous HTML render.
@@ -138,4 +141,5 @@
 
 | Version | Date | Description | Author | Reviewer | Approved By |
 | --- | --- | --- | --- | --- | --- |
+| 1.1 | 2026-04-12 | Added version-aware upload flow and API contract update | OpenAI Codex | Pending | Pending |
 | 1.0 | 2026-04-12 | Initial release | OpenAI Codex | Pending | Pending |

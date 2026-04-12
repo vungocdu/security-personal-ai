@@ -20,6 +20,30 @@ import type {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
 
+export class ApiClientError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly code?: string,
+  ) {
+    super(message);
+    this.name = "ApiClientError";
+  }
+}
+
+function parseApiError(payload: unknown): { code?: string; message: string } | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+  const maybeError = (payload as { error?: { code?: string; message?: string } }).error;
+  if (!maybeError || typeof maybeError !== "object") {
+    return null;
+  }
+  const message = typeof maybeError.message === "string" ? maybeError.message : "Request failed.";
+  const code = typeof maybeError.code === "string" ? maybeError.code : undefined;
+  return { code, message };
+}
+
 async function jsonFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
@@ -29,7 +53,9 @@ async function jsonFetch<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
+    const payload = (await response.json().catch(() => null)) as unknown;
+    const parsed = parseApiError(payload);
+    throw new ApiClientError(parsed?.message ?? `Request failed: ${response.status}`, response.status, parsed?.code);
   }
   return (await response.json()) as T;
 }
@@ -90,11 +116,11 @@ export const workspaceApi = {
     return jsonFetch<PreviewResource>(`/api/v1/documents/${documentId}/versions/${versionId}/preview/${pageNumber}`);
   },
 
-  async uploadDocument(file: File): Promise<DocumentUploadAcceptedResponse> {
+  async uploadDocument(file: File, documentId?: string): Promise<DocumentUploadAcceptedResponse> {
     if (!API_BASE_URL) {
       return {
-        document_id: "doc_uploaded_fixture",
-        document_version_id: "docver_uploaded_fixture_v1",
+        document_id: documentId ?? "doc_uploaded_fixture",
+        document_version_id: documentId ? `${documentId.replace("doc_", "docver_")}_v99` : "docver_uploaded_fixture_v1",
         index_job_id: "job_fixture_001",
         status: "accepted",
       };
@@ -102,12 +128,17 @@ export const workspaceApi = {
 
     const form = new FormData();
     form.append("file", file);
+    if (documentId) {
+      form.append("document_id", documentId);
+    }
     const response = await fetch(`${API_BASE_URL}/api/v1/documents`, {
       method: "POST",
       body: form,
     });
     if (!response.ok) {
-      throw new Error(`Upload failed: ${response.status}`);
+      const payload = (await response.json().catch(() => null)) as unknown;
+      const parsed = parseApiError(payload);
+      throw new ApiClientError(parsed?.message ?? `Upload failed: ${response.status}`, response.status, parsed?.code);
     }
     return (await response.json()) as DocumentUploadAcceptedResponse;
   },

@@ -1,7 +1,7 @@
 "use client";
 
 import { FileSpreadsheet, FileText, FolderTree, Mic, PanelLeft, PanelRight, Search, Send, UploadCloud } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,20 +34,27 @@ export function AnalystWorkspace() {
   const [queryLoading, setQueryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string>("No uploads in this session");
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [voiceDraft, setVoiceDraft] = useState<string | null>(null);
   const [panelView, setPanelView] = useState<PanelView>("desktop");
+
+  const refreshRepository = useCallback(async () => {
+    const collection = await workspaceApi.listDocuments();
+    setDocuments(collection);
+    const versions = await Promise.all(collection.data.map((document) => workspaceApi.listVersions(document.document_id)));
+    const mapped = versions.reduce<Record<string, DocumentVersionCollection>>((accumulator, versionCollection) => {
+      accumulator[versionCollection.document_id] = versionCollection;
+      return accumulator;
+    }, {});
+    setVersionsMap(mapped);
+
+    setSelectedDocumentId((previous) => (previous && !collection.data.some((item) => item.document_id === previous) ? null : previous));
+  }, []);
 
   useEffect(() => {
     async function bootstrap() {
       try {
-        const collection = await workspaceApi.listDocuments();
-        setDocuments(collection);
-        const versions = await Promise.all(collection.data.map((document) => workspaceApi.listVersions(document.document_id)));
-        const mapped = versions.reduce<Record<string, DocumentVersionCollection>>((accumulator, versionCollection) => {
-          accumulator[versionCollection.document_id] = versionCollection;
-          return accumulator;
-        }, {});
-        setVersionsMap(mapped);
+        await refreshRepository();
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : "Failed to load documents.");
       } finally {
@@ -56,9 +63,15 @@ export function AnalystWorkspace() {
     }
 
     void bootstrap();
-  }, []);
+  }, [refreshRepository]);
 
   const tree = useMemo(() => (documents ? mapDocumentsToTree(documents, versionsMap) : []), [documents, versionsMap]);
+  const selectedDocumentLabel = useMemo(() => {
+    if (!documents || !selectedDocumentId) {
+      return null;
+    }
+    return documents.data.find((item) => item.document_id === selectedDocumentId)?.title ?? null;
+  }, [documents, selectedDocumentId]);
 
   async function handleSubmit() {
     setQueryLoading(true);
@@ -98,8 +111,15 @@ export function AnalystWorkspace() {
     if (!files || files.length === 0) {
       return;
     }
-    const upload = await workspaceApi.uploadDocument(files[0]);
-    setUploadStatus(`Accepted ${upload.document_id} as ${upload.document_version_id}`);
+    setError(null);
+    try {
+      const upload = await workspaceApi.uploadDocument(files[0], selectedDocumentId ?? undefined);
+      const modeLabel = selectedDocumentId ? "Appended version" : "Accepted new document";
+      setUploadStatus(`${modeLabel}: ${upload.document_id} -> ${upload.document_version_id}`);
+      await refreshRepository();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Upload failed.");
+    }
   }
 
   function handleVoiceDraft() {
@@ -135,11 +155,16 @@ export function AnalystWorkspace() {
               </div>
               <Button variant="accent" size="sm" onClick={() => fileInputRef.current?.click()}>
                 <UploadCloud className="mr-2 h-4 w-4" />
-                Upload
+                {selectedDocumentId ? "Upload version" : "Upload"}
               </Button>
             </div>
             <input ref={fileInputRef} className="hidden" type="file" onChange={(event) => void handleUpload(event.target.files)} />
             <div className="mt-4 rounded-2xl bg-sand p-3 text-sm text-slate">{uploadStatus}</div>
+            {selectedDocumentLabel ? (
+              <div className="mt-2 rounded-2xl border border-accentSoft bg-[#fff8ec] p-3 text-xs text-[#6d531d]">
+                Selected target for version upload: {selectedDocumentLabel}
+              </div>
+            ) : null}
             <div className="mt-4 flex flex-wrap gap-2">
               <Badge>By ticker</Badge>
               <Badge variant="accent">By source</Badge>
@@ -160,8 +185,12 @@ export function AnalystWorkspace() {
                             {tickerNode.children?.map((document) => (
                               <button
                                 key={document.id}
-                                className="w-full rounded-2xl border border-white bg-white px-3 py-3 text-left hover:border-accentSoft hover:bg-[#fffaf3]"
+                                className={cn(
+                                  "w-full rounded-2xl border px-3 py-3 text-left hover:border-accentSoft hover:bg-[#fffaf3]",
+                                  selectedDocumentId === document.id ? "border-accent bg-[#fff7e8]" : "border-white bg-white",
+                                )}
                                 type="button"
+                                onClick={() => setSelectedDocumentId(document.id)}
                               >
                                 <div className="flex items-start justify-between gap-3">
                                   <div>
