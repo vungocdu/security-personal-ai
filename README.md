@@ -39,6 +39,43 @@ source .venv/bin/activate
 pytest -q
 ```
 
+## Qdrant connectivity check
+
+Configure backend environment:
+
+```bash
+cd backend
+cp .env.example .env.local
+```
+
+Set `QDRANT_URL` and `QDRANT_API_KEY` in `backend/.env.local`, then run:
+
+```bash
+cd backend
+source .venv/bin/activate
+python scripts/check_qdrant_connection.py
+```
+
+Expected output:
+
+```text
+collection_count=<number>
+collections=[...]
+```
+
+Run an end-to-end seed + search smoke test:
+
+```bash
+cd backend
+source .venv/bin/activate
+python scripts/seed_and_test_qdrant.py
+```
+
+Optional env for smoke script:
+
+- `QDRANT_TEST_COLLECTION` to force a collection name (default auto timestamp)
+- `QDRANT_TEST_KEEP_COLLECTION=true` to keep the seeded collection after test
+
 ## Run Next.js frontend locally
 
 ```bash
