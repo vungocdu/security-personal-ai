@@ -25,6 +25,12 @@ Health check:
 curl http://127.0.0.1:8000/health
 ```
 
+Dependency health check:
+
+```bash
+curl http://127.0.0.1:8000/health/dependencies
+```
+
 OpenAPI JSON:
 
 ```bash
@@ -114,6 +120,13 @@ Recommended Vercel project settings:
 - Root directory: `backend`
 - Runtime entrypoint: `backend/api/index.py`
 - Production health check: `/health`
+- Dependency health check: `/health/dependencies`
+
+For AD-compliant secret handling:
+
+- Keep `QDRANT_URL` and `QDRANT_API_KEY` only in backend Vercel environment.
+- Do **not** expose Qdrant secrets to frontend `NEXT_PUBLIC_*` variables.
+- Frontend should only receive `NEXT_PUBLIC_API_BASE_URL` that points to backend API.
 
 ## GitHub Actions baseline
 

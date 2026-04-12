@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 
 from app.errors import install_error_handlers
+from app.qdrant import QdrantConfigError, build_qdrant_client
 from app.routers.citations import router as citations_router
 from app.routers.documents import router as documents_router
 from app.routers.query import router as query_router
@@ -24,3 +26,48 @@ install_error_handlers(app)
 @app.get("/health", tags=["Internal"], summary="Lightweight health check")
 async def healthcheck() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/health/dependencies", tags=["Internal"], summary="Dependency health check")
+async def dependency_healthcheck() -> JSONResponse:
+    try:
+        client = build_qdrant_client()
+    except QdrantConfigError as exc:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "degraded",
+                "qdrant": {
+                    "configured": False,
+                    "reachable": False,
+                    "reason": str(exc),
+                },
+            },
+        )
+
+    try:
+        collections = client.get_collections()
+    except Exception as exc:  # pragma: no cover - network surface
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "degraded",
+                "qdrant": {
+                    "configured": True,
+                    "reachable": False,
+                    "reason": f"{exc.__class__.__name__}",
+                },
+            },
+        )
+
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": "ok",
+            "qdrant": {
+                "configured": True,
+                "reachable": True,
+                "collection_count": len(collections.collections),
+            },
+        },
+    )

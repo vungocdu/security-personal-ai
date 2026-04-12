@@ -16,6 +16,14 @@ def test_healthcheck() -> None:
     assert response.json() == {"status": "ok"}
 
 
+def test_dependency_healthcheck_degraded_without_qdrant_env() -> None:
+    response = client.get("/health/dependencies")
+    assert response.status_code == 503
+    payload = response.json()
+    assert payload["status"] == "degraded"
+    assert payload["qdrant"]["configured"] is False
+
+
 def test_query_response_contains_citations_and_debug() -> None:
     response = client.post(
         "/api/v1/query",
