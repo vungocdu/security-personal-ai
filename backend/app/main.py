@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
+from app.errors import install_error_handlers
 from app.routers.citations import router as citations_router
 from app.routers.documents import router as documents_router
 from app.routers.query import router as query_router
@@ -17,6 +18,7 @@ app.include_router(query_router)
 app.include_router(search_router)
 app.include_router(documents_router)
 app.include_router(citations_router)
+install_error_handlers(app)
 
 
 @app.get("/health", tags=["Internal"], summary="Lightweight health check")

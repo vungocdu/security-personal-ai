@@ -11,15 +11,10 @@ from app.schemas import (
     DocumentVersionCollection,
     PreviewResource,
 )
-from app.stubs import (
-    build_document,
-    build_document_collection,
-    build_document_versions,
-    build_preview,
-    build_upload_response,
-)
+from app.services import DocumentService
 
 router = APIRouter(prefix="/api/v1/documents", tags=["Documents"])
+service = DocumentService()
 
 
 @router.get("", response_model=DocumentCollection, summary="List documents visible to caller")
@@ -33,8 +28,16 @@ async def list_documents(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
 ) -> DocumentCollection:
-    _ = (ticker, document_type, source, language, date_from, date_to)
-    return build_document_collection(page, limit)
+    return service.list_documents(
+        ticker=ticker,
+        document_type=document_type,
+        source=source,
+        language=language,
+        date_from=date_from,
+        date_to=date_to,
+        page=page,
+        limit=limit,
+    )
 
 
 @router.post(
@@ -51,24 +54,30 @@ async def upload_document(
     publication_date: date | None = Form(default=None),
     source: str | None = Form(default=None),
 ) -> DocumentAcceptedResponse:
-    _ = (file, document_type, ticker, company_name, publication_date, source)
-    return build_upload_response()
+    return service.upload_document(
+        filename=file.filename or "uploaded-document",
+        document_type=document_type,
+        ticker=ticker,
+        company_name=company_name,
+        publication_date=publication_date,
+        source=source,
+    )
 
 
-@router.get("/{document_id}", response_model=DocumentResource, summary="Get logical document details")
-async def get_document(document_id: str) -> DocumentResource:
-    return build_document(document_id)
+@router.get("/{documentId}", response_model=DocumentResource, summary="Get logical document details")
+async def get_document(documentId: str) -> DocumentResource:
+    return service.get_document(documentId)
 
 
-@router.get("/{document_id}/versions", response_model=DocumentVersionCollection, summary="List visible versions for a logical document")
-async def list_document_versions(document_id: str) -> DocumentVersionCollection:
-    return build_document_versions(document_id)
+@router.get("/{documentId}/versions", response_model=DocumentVersionCollection, summary="List visible versions for a logical document")
+async def list_document_versions(documentId: str) -> DocumentVersionCollection:
+    return service.list_versions(documentId)
 
 
 @router.get(
-    "/{document_id}/versions/{version_id}/preview/{page_number}",
+    "/{documentId}/versions/{versionId}/preview/{pageNumber}",
     response_model=PreviewResource,
     summary="Resolve preview resource for a page in a specific version",
 )
-async def get_document_preview(document_id: str, version_id: str, page_number: int) -> PreviewResource:
-    return build_preview(document_id, version_id, page_number)
+async def get_document_preview(documentId: str, versionId: str, pageNumber: int) -> PreviewResource:
+    return service.get_preview(documentId, versionId, pageNumber)

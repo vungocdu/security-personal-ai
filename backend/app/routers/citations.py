@@ -3,11 +3,12 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from app.schemas import CitationResource
-from app.stubs import build_citation
+from app.services import CitationService
 
 router = APIRouter(prefix="/api/v1/citations", tags=["Citations"])
+service = CitationService()
 
 
-@router.get("/{citation_id}", response_model=CitationResource, summary="Resolve citation for UI preview or rehydration")
-async def get_citation(citation_id: str) -> CitationResource:
-    return build_citation(citation_id)
+@router.get("/{citationId}", response_model=CitationResource, summary="Resolve citation for UI preview or rehydration")
+async def get_citation(citationId: str) -> CitationResource:
+    return service.get_citation(citationId)
