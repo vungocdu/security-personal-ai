@@ -37,6 +37,21 @@ def test_healthcheck() -> None:
     assert response.json() == {"status": "ok"}
 
 
+def test_cors_preflight_allows_browser_frontend_origin() -> None:
+    origin = "https://frontend.example.com"
+    response = client.options(
+        "/api/v1/documents",
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "authorization,content-type",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == origin
+    assert "access-control-allow-methods" in response.headers
+
+
 def test_dependency_healthcheck_degraded_without_qdrant_env() -> None:
     response = client.get("/health/dependencies")
     assert response.status_code == 503

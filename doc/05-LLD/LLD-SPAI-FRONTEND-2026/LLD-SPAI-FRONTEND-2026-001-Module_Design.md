@@ -25,8 +25,12 @@
 
 ## 2. CONTEXT & ASSUMPTIONS
 
-- **Dependencies:** Next.js App Router, TypeScript, shadcn-style primitives, OpenAPI-backed fetch layer, backend preview endpoints.
-- **Assumptions & Constraints:** Frontend moi hoan toan; UI tone nghiem tuc theo analyst terminal; preview Word/Excel co the fallback download neu artifact chua san sang.
+- **Dependencies:** Next.js App Router, TypeScript, shadcn-style primitives, OpenAPI-backed fetch layer, backend preview endpoints, Firebase Web SDK (Auth).
+- **Assumptions & Constraints:**
+  - Frontend moi hoan toan; UI tone nghiem tuc theo analyst terminal.
+  - Auth Phase 1 su dung Firebase Email/Password sign-in; frontend lay Firebase ID token va gui `Authorization: Bearer <id_token>` den backend.
+  - Backend can duoc cau hinh CORS de cho phep frontend origin (Vercel preview/prod) goi API.
+  - Preview Word/Excel co the fallback download neu artifact chua san sang.
 
 ## 3. FUNCTIONAL DECOMPOSITION
 
@@ -102,7 +106,10 @@
 
 ## 9. SECURITY & PRIVACY CONTROLS
 
-- **Authentication & Authorization:** su dung bearer token hoac mocked header trong MVP client layer.
+- **Authentication & Authorization:**
+  - Firebase Auth (Email/Password) cap Firebase ID token o client.
+  - API client attach `Authorization: Bearer <Firebase ID token>` cho moi request can auth.
+  - Backend verify token va ap dung enforcement theo config runtime (`AUTH_ENFORCE=true`).
 - **Data Protection:** khong log raw snippets nhay cam o browser console.
 - **Input Validation / Sanitisation:** trim query input, validate upload file selection.
 - **Audit Logging:** khong local analytics; rely backend audit.
@@ -120,7 +127,11 @@
 - **Logs:** chi log error co kiem soat o API client.
 - **Metrics:** khong them analytics stack trong MVP.
 - **Tracing:** khong bat buoc client tracing.
-- **Feature Flags / Configuration:** `NEXT_PUBLIC_API_BASE_URL`.
+- **Feature Flags / Configuration:**
+  - `NEXT_PUBLIC_API_BASE_URL`
+  - Firebase public config: `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`,
+    `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, `NEXT_PUBLIC_FIREBASE_APP_ID`,
+    `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`.
 
 ## 12. VERIFICATION & TESTABILITY
 
@@ -141,5 +152,6 @@
 
 | Version | Date | Description | Author | Reviewer | Approved By |
 | --- | --- | --- | --- | --- | --- |
+| 1.2 | 2026-04-12 | Updated auth assumptions to Firebase Auth + clarified CORS requirement | OpenAI Codex | Pending | Pending |
 | 1.1 | 2026-04-12 | Added version-aware upload flow and API contract update | OpenAI Codex | Pending | Pending |
 | 1.0 | 2026-04-12 | Initial release | OpenAI Codex | Pending | Pending |

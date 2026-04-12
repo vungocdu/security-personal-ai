@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.config import load_config
 from app.errors import install_error_handlers
 from app.qdrant import QdrantConfigError, build_qdrant_client
 from app.routers.auth import router as auth_router
@@ -16,6 +18,18 @@ app = FastAPI(
     version="0.1.0",
     description="MVP FastAPI skeleton generated from the OpenAPI source of truth.",
 )
+
+config = load_config()
+if config.cors_allow_origins or config.cors_allow_origin_regex:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=config.cors_allow_origins,
+        allow_origin_regex=config.cors_allow_origin_regex,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        allow_credentials=False,
+        max_age=86400,
+    )
 
 app.include_router(query_router)
 app.include_router(search_router)

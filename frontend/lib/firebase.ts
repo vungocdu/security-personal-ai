@@ -1,16 +1,13 @@
 import { FirebaseApp, FirebaseOptions, getApp, getApps, initializeApp } from "firebase/app";
 import { Auth, getAuth } from "firebase/auth";
 
-function readEnv(name: string): string {
-  return process.env[name]?.trim() ?? "";
-}
-
 const firebaseConfig: FirebaseOptions = {
-  apiKey: readEnv("NEXT_PUBLIC_FIREBASE_API_KEY"),
-  authDomain: readEnv("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN"),
-  projectId: readEnv("NEXT_PUBLIC_FIREBASE_PROJECT_ID"),
-  appId: readEnv("NEXT_PUBLIC_FIREBASE_APP_ID"),
-  messagingSenderId: readEnv("NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID"),
+  // Next.js only inlines env vars when they are accessed statically.
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY?.trim() ?? "",
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN?.trim() ?? "",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim() ?? "",
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID?.trim() ?? "",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID?.trim() ?? "",
 };
 
 export function isFirebaseConfigured(): boolean {

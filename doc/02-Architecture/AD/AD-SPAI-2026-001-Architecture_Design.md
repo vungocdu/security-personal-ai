@@ -191,6 +191,10 @@ Trust boundary chính:
 | Vector Store | Qdrant | Chunk embeddings, chunk payload metadata, semantic retrieval index |
 | Observability Stack | Langfuse + structured application logs | AI traces, latency/cost metrics, operational monitoring for MVP |
 
+Operational note (browser-based deployments):
+
+- Khi frontend deploy tren domain khac backend (Vercel preview/prod), API Gateway phai duoc cau hinh CORS allowlist (env `CORS_ALLOW_ORIGINS` hoac `CORS_ALLOW_ORIGIN_REGEX`) de preflight/requests tu browser hop le.
+
 ### 6.4 Component View
 
 #### Presentation Layer

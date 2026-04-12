@@ -15,6 +15,8 @@ class AppConfig:
     firebase_service_account_path: str | None
     firebase_storage_bucket: str | None
     preview_url_ttl_minutes: int
+    cors_allow_origins: list[str]
+    cors_allow_origin_regex: str | None
 
 
 def _as_bool(raw: str | None, *, default: bool) -> bool:
@@ -40,6 +42,10 @@ def load_config() -> AppConfig:
     if preview_ttl_minutes <= 0:
         preview_ttl_minutes = 15
 
+    cors_allow_origins_raw = (os.getenv("CORS_ALLOW_ORIGINS") or "").strip()
+    cors_allow_origins = [item.strip() for item in cors_allow_origins_raw.split(",") if item.strip()]
+    cors_allow_origin_regex = (os.getenv("CORS_ALLOW_ORIGIN_REGEX") or "").strip() or None
+
     return AppConfig(
         qdrant_url=(os.getenv("QDRANT_URL") or "").strip() or None,
         qdrant_api_key=(os.getenv("QDRANT_API_KEY") or "").strip() or None,
@@ -50,4 +56,6 @@ def load_config() -> AppConfig:
         firebase_service_account_path=(os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH") or "").strip() or None,
         firebase_storage_bucket=(os.getenv("FIREBASE_STORAGE_BUCKET") or "").strip() or None,
         preview_url_ttl_minutes=preview_ttl_minutes,
+        cors_allow_origins=cors_allow_origins,
+        cors_allow_origin_regex=cors_allow_origin_regex,
     )
