@@ -28,7 +28,7 @@
 - **Dependencies:** Next.js App Router, TypeScript, shadcn-style primitives, OpenAPI-backed fetch layer, backend preview endpoints, Firebase Web SDK (Auth).
 - **Assumptions & Constraints:**
   - Frontend moi hoan toan; UI tone nghiem tuc theo analyst terminal.
-  - Auth Phase 1 su dung Firebase Email/Password sign-in; frontend lay Firebase ID token va gui `Authorization: Bearer <id_token>` den backend.
+  - Auth Phase 1 su dung Firebase Auth; uu tien Email/Password, va co the mo rong Google sign-in (SSO). Frontend lay Firebase ID token va gui `Authorization: Bearer <id_token>` den backend.
   - Backend can duoc cau hinh CORS de cho phep frontend origin (Vercel preview/prod) goi API.
   - Preview Word/Excel co the fallback download neu artifact chua san sang.
 
@@ -108,6 +108,7 @@
 
 - **Authentication & Authorization:**
   - Firebase Auth (Email/Password) cap Firebase ID token o client.
+  - Google sign-in (SSO) neu duoc bat o Firebase project va authorized domains.
   - API client attach `Authorization: Bearer <Firebase ID token>` cho moi request can auth.
   - Backend verify token va ap dung enforcement theo config runtime (`AUTH_ENFORCE=true`).
 - **Data Protection:** khong log raw snippets nhay cam o browser console.

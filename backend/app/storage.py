@@ -16,9 +16,10 @@ class StorageConfigError(RuntimeError):
 def _resolve_bucket_name(config: AppConfig) -> str:
     if config.firebase_storage_bucket:
         return config.firebase_storage_bucket
-    if config.firebase_project_id:
-        return f"{config.firebase_project_id}.firebasestorage.app"
-    raise StorageConfigError("Missing FIREBASE_STORAGE_BUCKET or FIREBASE_PROJECT_ID.")
+    raise StorageConfigError(
+        "Missing FIREBASE_STORAGE_BUCKET. Configure an existing GCS bucket name "
+        "(e.g. 'my-project-spai-storage') for Firebase Admin Storage access."
+    )
 
 
 def _object_path(*, document_id: str, document_version_id: str, filename: str) -> str:
@@ -71,4 +72,3 @@ def store_uploaded_source(
         rewind=True,
     )
     return StoredObject(bucket=bucket.name, object_path=path)
-

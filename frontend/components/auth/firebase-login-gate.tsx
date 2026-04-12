@@ -1,6 +1,14 @@
 "use client";
 
-import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signOut, User } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signOut,
+  User,
+} from "firebase/auth";
 import { useEffect, useState } from "react";
 
 import { AnalystWorkspace } from "@/components/workspace/analyst-workspace";
@@ -98,6 +106,25 @@ export function FirebaseLoginGate() {
     }
   }
 
+  async function handleGoogleSignIn() {
+    const auth = getFirebaseAuth();
+    if (!auth) {
+      setError("Firebase Auth is not available.");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
+      await signInWithPopup(auth, provider);
+    } catch (caught) {
+      setError(extractErrorMessage(caught));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function handleSignOut() {
     const auth = getFirebaseAuth();
     if (!auth) {
@@ -137,9 +164,17 @@ export function FirebaseLoginGate() {
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle>Sign in to Analyst Workspace</CardTitle>
-            <CardDescription>Firebase Email/Password authentication (project: actiwell-74477).</CardDescription>
+            <CardDescription>Firebase authentication (Email/Password, optional Google sign-in) (project: actiwell-74477).</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <Button className="w-full" variant="secondary" onClick={() => void handleGoogleSignIn()} disabled={submitting}>
+              Continue with Google
+            </Button>
+            <div className="flex items-center gap-3 text-xs text-slate">
+              <div className="h-px flex-1 bg-line" />
+              <span>or</span>
+              <div className="h-px flex-1 bg-line" />
+            </div>
             <label className="flex flex-col gap-2 text-sm font-medium text-ink">
               Email
               <input
