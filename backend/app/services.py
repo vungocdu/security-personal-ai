@@ -5,8 +5,10 @@ from datetime import date
 
 from fastapi import HTTPException, status
 
+from app.auth import AuthenticatedUser
 from app.repositories import fixture_repository
 from app.schemas import (
+    AuthMeResponse,
     CitationResource,
     DocumentAcceptedResponse,
     DocumentCollection,
@@ -123,6 +125,12 @@ class CitationService:
         return citation
 
 
+@dataclass(slots=True)
+class AuthService:
+    def me(self, user: AuthenticatedUser) -> AuthMeResponse:
+        return AuthMeResponse(uid=user.uid, email=user.email, name=user.name)
+
+
 def not_found(code: str, message: str) -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
@@ -135,3 +143,4 @@ def conflict(code: str, message: str) -> HTTPException:
         status_code=status.HTTP_409_CONFLICT,
         detail={"code": code, "message": message},
     )
+

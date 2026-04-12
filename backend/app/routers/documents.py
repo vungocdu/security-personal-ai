@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, File, Form, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 
+from app.auth import require_authenticated_user
 from app.schemas import (
     DocumentAcceptedResponse,
     DocumentCollection,
@@ -13,7 +14,7 @@ from app.schemas import (
 )
 from app.services import DocumentService
 
-router = APIRouter(prefix="/api/v1/documents", tags=["Documents"])
+router = APIRouter(prefix="/api/v1/documents", tags=["Documents"], dependencies=[Depends(require_authenticated_user)])
 service = DocumentService()
 
 

@@ -67,6 +67,12 @@ class SearchRequest(StrictModel):
     limit: int = Field(default=20, ge=1, le=100)
 
 
+class AuthMeResponse(StrictModel):
+    uid: str
+    email: str | None = None
+    name: str | None = None
+
+
 class ScoreBreakdown(StrictModel):
     dense: float | None = None
     sparse: float | None = None

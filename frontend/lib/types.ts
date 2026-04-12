@@ -151,6 +151,12 @@ export interface DocumentUploadAcceptedResponse {
   status: "accepted";
 }
 
+export interface AuthMeResponse {
+  uid: string;
+  email?: string | null;
+  name?: string | null;
+}
+
 export interface RepositoryNode {
   id: string;
   label: string;

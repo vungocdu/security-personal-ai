@@ -7,6 +7,7 @@ import {
   fixtureVersions,
 } from "@/lib/fixtures";
 import type {
+  AuthMeResponse,
   CitationResource,
   DocumentCollection,
   DocumentUploadAcceptedResponse,
@@ -17,6 +18,7 @@ import type {
   SearchRequest,
   SearchResponse,
 } from "@/lib/types";
+import { getFirebaseIdToken } from "@/lib/firebase";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
 
@@ -45,10 +47,12 @@ function parseApiError(payload: unknown): { code?: string; message: string } | n
 }
 
 async function jsonFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const authHeader = await buildAuthorizationHeader();
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      ...(authHeader ? { Authorization: authHeader } : {}),
       ...(init?.headers ?? {}),
     },
   });
@@ -60,7 +64,22 @@ async function jsonFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function buildAuthorizationHeader(): Promise<string | null> {
+  if (!API_BASE_URL) {
+    return null;
+  }
+  const token = await getFirebaseIdToken();
+  return token ? `Bearer ${token}` : null;
+}
+
 export const workspaceApi = {
+  async getMe(): Promise<AuthMeResponse> {
+    if (!API_BASE_URL) {
+      return { uid: "fixture-user", email: "fixture@example.com", name: "Fixture User" };
+    }
+    return jsonFetch<AuthMeResponse>("/api/v1/auth/me");
+  },
+
   async listDocuments(): Promise<DocumentCollection> {
     if (!API_BASE_URL) {
       return fixtureDocuments;
@@ -131,9 +150,11 @@ export const workspaceApi = {
     if (documentId) {
       form.append("document_id", documentId);
     }
+    const authHeader = await buildAuthorizationHeader();
     const response = await fetch(`${API_BASE_URL}/api/v1/documents`, {
       method: "POST",
       body: form,
+      headers: authHeader ? { Authorization: authHeader } : undefined,
     });
     if (!response.ok) {
       const payload = (await response.json().catch(() => null)) as unknown;

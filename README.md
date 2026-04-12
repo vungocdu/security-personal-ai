@@ -82,6 +82,49 @@ Optional env for smoke script:
 - `QDRANT_TEST_COLLECTION` to force a collection name (default auto timestamp)
 - `QDRANT_TEST_KEEP_COLLECTION=true` to keep the seeded collection after test
 
+## Firebase Auth setup (shared Actiwell project)
+
+This repo uses Firebase Email/Password authentication and backend-side Firebase ID token verification.
+
+1. Link repo to shared Firebase project:
+
+```bash
+firebase use actiwell-74477
+```
+
+2. Backend env (`backend/.env.local`):
+
+```bash
+AUTH_ENFORCE=true
+FIREBASE_PROJECT_ID=actiwell-74477
+FIREBASE_SERVICE_ACCOUNT_JSON='{"type":"service_account", ...}'
+```
+
+If this environment also uses Gemini APIs, keep `GEMINI_API_KEY` in backend secret storage of the same Actiwell project context; do not expose it to frontend.
+
+Alternative for local development:
+
+```bash
+FIREBASE_SERVICE_ACCOUNT_PATH=/absolute/path/to/service-account.json
+```
+
+3. Frontend env (`frontend/.env.local`):
+
+```bash
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
+NEXT_PUBLIC_FIREBASE_API_KEY=<firebase-web-api-key>
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=actiwell-74477.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=actiwell-74477
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=447988273650
+NEXT_PUBLIC_FIREBASE_APP_ID=<firebase-web-app-id>
+```
+
+4. Login flow:
+
+- Open frontend and sign in using Firebase Email/Password.
+- Frontend sends Firebase ID token as `Authorization: Bearer <id_token>`.
+- Backend verifies token via Firebase Admin SDK before allowing `/api/v1/query`, `/api/v1/search`, `/api/v1/documents`, `/api/v1/citations`.
+
 ## Run Next.js frontend locally
 
 ```bash
@@ -95,6 +138,8 @@ The frontend defaults to fixture mode. To connect to the FastAPI backend:
 ```bash
 export NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
 ```
+
+When `NEXT_PUBLIC_FIREBASE_*` is configured, the page requires Firebase login before loading the workspace.
 
 Frontend quality gates:
 
@@ -125,8 +170,10 @@ Recommended Vercel project settings:
 For AD-compliant secret handling:
 
 - Keep `QDRANT_URL` and `QDRANT_API_KEY` only in backend Vercel environment.
+- Keep `FIREBASE_SERVICE_ACCOUNT_JSON` only in backend Vercel environment.
 - Do **not** expose Qdrant secrets to frontend `NEXT_PUBLIC_*` variables.
-- Frontend should only receive `NEXT_PUBLIC_API_BASE_URL` that points to backend API.
+- Do **not** expose Firebase service account/private keys to frontend `NEXT_PUBLIC_*` variables.
+- Frontend should only receive `NEXT_PUBLIC_API_BASE_URL` and Firebase Web App public config (`NEXT_PUBLIC_FIREBASE_*`).
 
 ## GitHub Actions baseline
 

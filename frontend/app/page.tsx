@@ -1,5 +1,5 @@
-import { AnalystWorkspace } from "@/components/workspace/analyst-workspace";
+import { FirebaseLoginGate } from "@/components/auth/firebase-login-gate";
 
 export default function HomePage() {
-  return <AnalystWorkspace />;
+  return <FirebaseLoginGate />;
 }

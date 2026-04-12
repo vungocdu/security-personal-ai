@@ -12,7 +12,7 @@
 | --- | --- |
 | **Project** | Security Personal AI |
 | **System / Component** | Securities Research Document Intelligence Platform |
-| **Document Version** | 0.3 Draft |
+| **Document Version** | 0.4 Draft |
 | **Status** | Draft |
 | **Classification** | Confidential |
 | **Author** | OpenAI Codex, AI Architecture Draft |
@@ -42,7 +42,7 @@
 ## 1. Executive Summary
 
 **Solution Overview:**  
-Hệ thống được thiết kế như một nền tảng RAG chuyên biệt cho chuyên gia chứng khoán để truy vấn kho tài liệu nghiệp vụ bằng ngôn ngữ tự nhiên, trả lời có citation và cho phép kiểm chứng nguồn ở cấp tài liệu, trang và đoạn. Kiến trúc Phase 1 theo hướng query-first, ưu tiên ingest, indexing, hybrid retrieval, metadata filtering, reranking, answer synthesis và citation preview. Bản v0.3 bổ sung metadata contract tối thiểu, mandatory document versioning, retrieval/rerank contract và citation preview contract để team có thể triển khai nhất quán, đồng thời giữ MVP ở trạng thái tối giản, không yêu cầu thêm observability stack nặng ngoài Langfuse và structured application logs. Các năng lực như query history, workspace, watchlist, alerts và analytics người dùng chưa đưa vào baseline giai đoạn này.
+Hệ thống được thiết kế như một nền tảng RAG chuyên biệt cho chuyên gia chứng khoán để truy vấn kho tài liệu nghiệp vụ bằng ngôn ngữ tự nhiên, trả lời có citation và cho phép kiểm chứng nguồn ở cấp tài liệu, trang và đoạn. Kiến trúc Phase 1 theo hướng query-first, ưu tiên ingest, indexing, hybrid retrieval, metadata filtering, reranking, answer synthesis và citation preview. Bản v0.4 giữ nguyên retrieval core và bổ sung trust boundary xác thực bằng Firebase Auth (Email/Password sign-in ở frontend, Firebase ID token verification ở backend) để đồng bộ với hướng triển khai Vercel và project dùng chung Actiwell (`actiwell-74477`). Các năng lực như query history, workspace, watchlist, alerts và analytics người dùng chưa đưa vào baseline giai đoạn này.
 
 **Highlights / Key Changes:**
 
@@ -50,6 +50,7 @@ Hệ thống được thiết kế như một nền tảng RAG chuyên biệt ch
 - Tách rõ năng lực Phase 1 và các hạng mục deferred để tránh loãng retrieval core.
 - Giữ security enforcement ở retrieval stage, không chỉ ở tầng UI hoặc post-filter.
 - Bổ sung contract đủ chi tiết cho metadata, versioning, hybrid retrieval và citation preview.
+- Chuẩn hóa xác thực qua Firebase Auth để backend không phụ thuộc credential local tự quản lý.
 
 **Compliance Status:**
 
@@ -168,7 +169,7 @@ Hệ thống nằm giữa người dùng nghiệp vụ và kho tài liệu chuy�
 - Chuyên gia chứng khoán dùng web UI để hỏi bằng văn bản và kiểm tra citation.
 - System administrator quản lý user, quyền truy cập và tình trạng indexing.
 - Nguồn tài liệu vào gồm upload thủ công và batch import đơn giản từ repository nội bộ hoặc thư mục được chỉ định.
-- Identity provider cung cấp xác thực và thông tin vai trò người dùng.
+- Firebase Authentication (project `actiwell-74477`) cung cấp xác thực Email/Password và phát hành ID token cho frontend.
 - Monitoring/logging platform nhận trace, metric, log kỹ thuật.
 
 Trust boundary chính:
@@ -181,8 +182,8 @@ Trust boundary chính:
 
 | Container | Technology Direction | Responsibility |
 | --- | --- | --- |
-| Web Application | Next.js | Query input, metadata filters, citation list, preview, upload UI, indexing status |
-| API Gateway | FastAPI | Authentication, authorization, query endpoint, document APIs, citation payload formatting |
+| Web Application | Next.js + Firebase Web SDK | Query input, metadata filters, citation list, preview, upload UI, indexing status, sign-in Email/Password |
+| API Gateway | FastAPI + Firebase Admin SDK | Verify Firebase ID token, authorization, query endpoint, document APIs, citation payload formatting |
 | Orchestrator Service | LangGraph-based Python service | Intent classification nhẹ, entity extraction, filter builder, retrieval orchestration, rerank, synthesis, response validation |
 | Ingestion Worker | Python background worker | Parsing, OCR orchestration, cleaning, chunking, metadata enrichment, embedding, indexing |
 | Object Storage | S3/R2/MinIO | Lưu file gốc và preview artifacts |
@@ -201,7 +202,7 @@ Trust boundary chính:
 
 #### Application/API Layer
 
-- Auth Controller: xác thực và nạp access scope.
+- Auth Controller: verify Firebase ID token, ánh xạ principal (`uid`, `email`) và nạp access scope.
 - Query Controller: nhận query request, tạo trace, gọi orchestrator.
 - Document Controller: upload, list, get status, reindex.
 - Citation Controller: chuẩn hóa citation payload cho UI preview.
@@ -311,6 +312,7 @@ Trust boundary chính:
 | ADR-0007 | Hybrid retrieval phải gồm dense + sparse + metadata filter + fusion + rerank | Accepted | Tránh trượt về vector search thuần, tăng precision cho ticker, pháp lý và thuật ngữ tài chính | Cần định nghĩa retrieval contract và scoring pipeline rõ ràng |
 | ADR-0008 | Document versioning là bắt buộc ngay từ Phase 1 | Accepted | Tài liệu chứng khoán có bản sửa đổi, cập nhật, revised report, amended filing | Citation và retrieval phải luôn tham chiếu bản hiệu lực đúng |
 | ADR-0009 | Citation preview phải support page-level và chunk-level anchor | Accepted | User cần bấm citation và thấy đúng bằng chứng, không chỉ mở đúng file | Cần preview artifacts, text offset mapping và API payload chuẩn |
+| ADR-0010 | Chuẩn hóa authentication qua Firebase Auth project dùng chung Actiwell | Accepted | Loại bỏ credential local tự quản lý, đồng bộ với deployment Vercel và trust boundary cloud | Backend phải verify ID token bằng Firebase Admin SDK và quản lý service account secret ở backend env |
 
 ---
 
@@ -337,6 +339,7 @@ Trust boundary chính:
 - `document_citations`
 - `companies`
 - `ticker_aliases`
+- `users`
 - `user_roles`
 - `user_document_permissions`
 - `index_jobs`
@@ -465,8 +468,8 @@ Trust boundary chính:
 
 | Area | Design | Control Reference |
 | --- | --- | --- |
-| Identity Provider | OIDC/OAuth compatible provider hoặc SSO nội bộ | Security plan pending |
-| Session Management | Short-lived session/JWT with backend validation | Security plan pending |
+| Identity Provider | Firebase Authentication (Email/Password), shared project `actiwell-74477` | Security plan pending |
+| Session Management | Firebase ID token (short-lived) do frontend gửi bearer token; backend verify qua Firebase Admin SDK | Security plan pending |
 | RBAC / ABAC | Role + document sensitivity + source ownership + organization/team scope | RBAC matrix pending |
 
 ### 9.3 Data Protection
@@ -482,6 +485,8 @@ Trust boundary chính:
 - Log theo request ID, document ID, job ID; không log full corpus tràn lan.
 - MVP chỉ cần các cảnh báo cơ bản cho indexing failure, vector DB unavailability, provider timeout spike.
 - Runbook cần có quy trình revoke access, rotate secrets, tạm dừng provider nếu có data exposure concern.
+- Firebase service account secret chỉ nằm ở backend environment; frontend chỉ dùng public web config `NEXT_PUBLIC_FIREBASE_*`.
+- Gemini API key (nếu bật extraction/synthesis provider) dùng cùng project secret context với Firebase (`actiwell-74477`) và chỉ cấp cho backend runtime.
 
 ### 9.5 Compliance & Privacy
 
@@ -723,6 +728,7 @@ Trust boundary chính:
 
 | Version | Date | Author | Summary |
 | --- | --- | --- | --- |
+| 0.4 | 2026-04-12 | OpenAI Codex | Added Firebase Auth architecture decision, token trust boundary, and shared Actiwell project alignment |
 | 0.3 | 2026-04-12 | OpenAI Codex | Added metadata contract, mandatory versioning, hybrid retrieval/rerank contract, citation preview contract |
 | 0.2 | 2026-04-12 | OpenAI Codex | Initial architecture draft aligned to Phase 1 query-first scope |
 

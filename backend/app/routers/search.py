@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.auth import require_authenticated_user
 from app.schemas import SearchRequest, SearchResponse
 from app.services import SearchService
 
-router = APIRouter(prefix="/api/v1/search", tags=["Search"])
+router = APIRouter(prefix="/api/v1/search", tags=["Search"], dependencies=[Depends(require_authenticated_user)])
 service = SearchService()
 
 
