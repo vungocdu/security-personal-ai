@@ -1,0 +1,935 @@
+openapi: 3.0.3
+info:
+  title: Security Personal AI Query/Search/Document/Citation API
+  version: 0.1.0
+  description: |
+    MVP OpenAPI spec for the Security Personal AI Phase 1 query-first RAG platform.
+    This spec is the source of truth for Query, Search, Document, and Citation APIs.
+servers:
+  - url: https://api.example.com
+    description: Production placeholder
+  - url: http://localhost:8000
+    description: Local development
+tags:
+  - name: Query
+  - name: Search
+  - name: Documents
+  - name: Citations
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/query:
+    post:
+      tags: [Query]
+      summary: Execute grounded query with synthesis and citations
+      operationId: executeQuery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryRequest'
+            examples:
+              basic:
+                value:
+                  query: "Rủi ro lớn nhất của HPG trong 2024 là gì?"
+                  filters:
+                    ticker: ["HPG"]
+                    document_type: ["annual_report", "research_report"]
+                    date_from: "2024-01-01"
+                    date_to: "2024-12-31"
+                  options:
+                    max_citations: 8
+      responses:
+        '200':
+          description: Successful grounded answer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResponse'
+        '401':
+          $ref: '#/components/responses/AuthInvalidToken'
+        '403':
+          $ref: '#/components/responses/AuthForbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '504':
+          $ref: '#/components/responses/UpstreamTimeout'
+  /api/v1/search:
+    post:
+      tags: [Search]
+      summary: Search documents or chunks without synthesis
+      operationId: searchDocuments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchRequest'
+            examples:
+              basic:
+                value:
+                  query: "trai phieu covenant impairment"
+                  filters:
+                    ticker: ["SSI"]
+                    document_type: ["annual_report", "research_report"]
+                    language: ["vi", "en"]
+                  page: 1
+                  limit: 20
+      responses:
+        '200':
+          description: Successful search response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+              examples:
+                basic:
+                  value:
+                    request_id: "eb1df090-df59-4a54-8500-cf94dd2ddab7"
+                    query: "trai phieu covenant impairment"
+                    page: 1
+                    limit: 20
+                    total: 52
+                    results:
+                      - result_type: chunk
+                        document_id: "doc_ssi_ar_2023"
+                        document_version_id: "docver_ssi_ar_2023_v1"
+                        title: "SSI Annual Report 2023"
+                        document_type: "annual_report"
+                        ticker: "SSI"
+                        publication_date: "2024-03-28"
+                        page_number: 134
+                        section_heading: "Borrowings and Bonds"
+                        chunk_id: "chk_1102"
+                        snippet: "Tap doan co cac dieu khoan rang buoc lien quan den cac khoan vay..."
+                        preview_url: "/api/v1/documents/doc_ssi_ar_2023/versions/docver_ssi_ar_2023_v1/preview/134"
+                        viewer_anchor: "page=134&chunk=chk_1102"
+                        scores:
+                          dense: 0.82
+                          sparse: 13.4
+                          rerank: 0.91
+        '401':
+          $ref: '#/components/responses/AuthInvalidToken'
+        '403':
+          $ref: '#/components/responses/AuthForbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '504':
+          $ref: '#/components/responses/UpstreamTimeout'
+  /api/v1/documents:
+    get:
+      tags: [Documents]
+      summary: List documents visible to caller
+      operationId: listDocuments
+      parameters:
+        - $ref: '#/components/parameters/TickerQuery'
+        - $ref: '#/components/parameters/DocumentTypeQuery'
+        - $ref: '#/components/parameters/SourceQuery'
+        - $ref: '#/components/parameters/LanguageQuery'
+        - $ref: '#/components/parameters/DateFromQuery'
+        - $ref: '#/components/parameters/DateToQuery'
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+      responses:
+        '200':
+          description: Document collection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentCollection'
+              examples:
+                basic:
+                  value:
+                    page: 1
+                    limit: 20
+                    total: 2
+                    data:
+                      - document_id: "doc_hpg_ar_2024"
+                        title: "HPG Annual Report 2024"
+                        document_type: "annual_report"
+                        ticker: "HPG"
+                        source: "internal_repository"
+                        language: "vi"
+                        publication_date: "2025-03-29"
+                        current_version_id: "docver_hpg_ar_2024_v1"
+                        access_level: "internal"
+                        index_status: "indexed"
+        '401':
+          $ref: '#/components/responses/AuthInvalidToken'
+        '403':
+          $ref: '#/components/responses/AuthForbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    post:
+      tags: [Documents]
+      summary: Upload document and create ingestion job
+      operationId: uploadDocument
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                document_type:
+                  type: string
+                ticker:
+                  type: string
+                company_name:
+                  type: string
+                publication_date:
+                  type: string
+                  format: date
+                source:
+                  type: string
+      responses:
+        '202':
+          description: Upload accepted for async ingestion
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentAcceptedResponse'
+        '401':
+          $ref: '#/components/responses/AuthInvalidToken'
+        '403':
+          $ref: '#/components/responses/AuthForbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+  /api/v1/documents/{documentId}:
+    get:
+      tags: [Documents]
+      summary: Get logical document details
+      operationId: getDocument
+      parameters:
+        - $ref: '#/components/parameters/DocumentIdPath'
+      responses:
+        '200':
+          description: Document resource
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResource'
+        '401':
+          $ref: '#/components/responses/AuthInvalidToken'
+        '403':
+          $ref: '#/components/responses/AuthForbidden'
+        '404':
+          $ref: '#/components/responses/ResourceNotFound'
+  /api/v1/documents/{documentId}/versions:
+    get:
+      tags: [Documents]
+      summary: List visible versions for a logical document
+      operationId: listDocumentVersions
+      parameters:
+        - $ref: '#/components/parameters/DocumentIdPath'
+      responses:
+        '200':
+          description: Document version collection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentVersionCollection'
+              examples:
+                basic:
+                  value:
+                    document_id: "doc_hpg_ar_2024"
+                    data:
+                      - document_id: "doc_hpg_ar_2024"
+                        document_version_id: "docver_hpg_ar_2024_v1"
+                        version_label: "v1"
+                        is_current_version: true
+                        supersedes_version_id: null
+                        publication_date: "2025-03-29"
+                        parse_status: "indexed"
+        '401':
+          $ref: '#/components/responses/AuthInvalidToken'
+        '403':
+          $ref: '#/components/responses/AuthForbidden'
+        '404':
+          $ref: '#/components/responses/ResourceNotFound'
+  /api/v1/documents/{documentId}/versions/{versionId}/preview/{pageNumber}:
+    get:
+      tags: [Documents]
+      summary: Resolve preview resource for a page in a specific version
+      operationId: getDocumentPreview
+      parameters:
+        - $ref: '#/components/parameters/DocumentIdPath'
+        - $ref: '#/components/parameters/VersionIdPath'
+        - $ref: '#/components/parameters/PageNumberPath'
+      responses:
+        '200':
+          description: Preview resource
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreviewResource'
+        '401':
+          $ref: '#/components/responses/AuthInvalidToken'
+        '403':
+          $ref: '#/components/responses/AuthForbidden'
+        '404':
+          $ref: '#/components/responses/ResourceNotFound'
+        '409':
+          $ref: '#/components/responses/PreviewNotReady'
+  /api/v1/citations/{citationId}:
+    get:
+      tags: [Citations]
+      summary: Resolve citation for UI preview or rehydration
+      operationId: getCitation
+      parameters:
+        - $ref: '#/components/parameters/CitationIdPath'
+      responses:
+        '200':
+          description: Citation resource
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CitationResource'
+              examples:
+                basic:
+                  value:
+                    citation_id: "cit_001"
+                    document_id: "doc_hpg_ar_2024"
+                    document_version_id: "docver_hpg_ar_2024_v1"
+                    title: "HPG Annual Report 2024"
+                    source: "internal_repository"
+                    document_type: "annual_report"
+                    page_number: 87
+                    section_heading: "Risk Factors"
+                    chunk_id: "chk_009182"
+                    snippet: "Bien dong gia quang sat va than coc co the anh huong den bien loi nhuan gop..."
+                    text_offset_start: 18240
+                    text_offset_end: 18410
+                    preview_url: "/api/v1/documents/doc_hpg_ar_2024/versions/docver_hpg_ar_2024_v1/preview/87"
+                    viewer_anchor: "page=87&chunk=chk_009182"
+                    version_label: "v1"
+                    confidence: 0.91
+        '401':
+          $ref: '#/components/responses/AuthInvalidToken'
+        '403':
+          $ref: '#/components/responses/AuthForbidden'
+        '404':
+          $ref: '#/components/responses/ResourceNotFound'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    DocumentIdPath:
+      name: documentId
+      in: path
+      required: true
+      schema:
+        type: string
+    VersionIdPath:
+      name: versionId
+      in: path
+      required: true
+      schema:
+        type: string
+    PageNumberPath:
+      name: pageNumber
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    CitationIdPath:
+      name: citationId
+      in: path
+      required: true
+      schema:
+        type: string
+    TickerQuery:
+      name: ticker
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Single ticker filter for MVP GET listing
+    DocumentTypeQuery:
+      name: document_type
+      in: query
+      required: false
+      schema:
+        type: string
+    SourceQuery:
+      name: source
+      in: query
+      required: false
+      schema:
+        type: string
+    LanguageQuery:
+      name: language
+      in: query
+      required: false
+      schema:
+        type: string
+    DateFromQuery:
+      name: date_from
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date
+    DateToQuery:
+      name: date_to
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date
+    PageQuery:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    LimitQuery:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  responses:
+    AuthInvalidToken:
+      description: Missing or invalid bearer token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    AuthForbidden:
+      description: Caller is not allowed to access resource
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    ResourceNotFound:
+      description: Resource was not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    PreviewNotReady:
+      description: Preview artifact is not ready
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    RateLimitExceeded:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    UpstreamTimeout:
+      description: Upstream retrieval or model dependency timed out
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+  schemas:
+    QueryRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        filters:
+          $ref: '#/components/schemas/FilterObject'
+        options:
+          type: object
+          properties:
+            include_debug:
+              type: boolean
+              default: false
+            max_citations:
+              type: integer
+              minimum: 1
+              maximum: 20
+              default: 8
+      additionalProperties: false
+    SearchRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        filters:
+          $ref: '#/components/schemas/FilterObject'
+        page:
+          type: integer
+          minimum: 1
+          default: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      additionalProperties: false
+    FilterObject:
+      type: object
+      properties:
+        ticker:
+          type: array
+          items:
+            type: string
+        document_type:
+          type: array
+          items:
+            type: string
+            enum:
+              - annual_report
+              - financial_statement
+              - research_report
+              - legal_document
+              - disclosure
+              - internal_note
+        source:
+          type: array
+          items:
+            type: string
+        language:
+          type: array
+          items:
+            type: string
+            example: vi
+        date_from:
+          type: string
+          format: date
+        date_to:
+          type: string
+          format: date
+        reporting_period:
+          type: array
+          items:
+            type: string
+        sector:
+          type: array
+          items:
+            type: string
+        market:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+    QueryResponse:
+      type: object
+      required:
+        - request_id
+        - query
+        - answer
+        - citations
+      properties:
+        request_id:
+          type: string
+          format: uuid
+        query:
+          type: string
+        filters:
+          $ref: '#/components/schemas/FilterObject'
+        answer:
+          $ref: '#/components/schemas/AnswerObject'
+        citations:
+          type: array
+          items:
+            $ref: '#/components/schemas/CitationResource'
+        debug:
+          allOf:
+            - $ref: '#/components/schemas/DebugInfo'
+          nullable: true
+    SearchResponse:
+      type: object
+      required:
+        - request_id
+        - query
+        - page
+        - limit
+        - total
+        - results
+      properties:
+        request_id:
+          type: string
+          format: uuid
+        query:
+          type: string
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        results:
+          type: array
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/SearchChunkResult'
+              - $ref: '#/components/schemas/SearchDocumentResult'
+    AnswerObject:
+      type: object
+      required:
+        - summary
+        - confidence
+        - insufficient_evidence
+      properties:
+        summary:
+          type: string
+        confidence:
+          type: string
+          enum: [low, medium, high]
+        insufficient_evidence:
+          type: boolean
+        disclaimer:
+          type: string
+    DebugInfo:
+      type: object
+      properties:
+        retrieval_strategy:
+          type: string
+        dense_top_k:
+          type: integer
+        sparse_top_k:
+          type: integer
+        fused_top_k:
+          type: integer
+        context_top_n:
+          type: integer
+    SearchChunkResult:
+      type: object
+      required:
+        - result_type
+        - document_id
+        - document_version_id
+        - title
+        - document_type
+        - chunk_id
+        - snippet
+      properties:
+        result_type:
+          type: string
+          enum: [chunk]
+        document_id:
+          type: string
+        document_version_id:
+          type: string
+        title:
+          type: string
+        document_type:
+          type: string
+        ticker:
+          type: string
+        publication_date:
+          type: string
+          format: date
+        page_number:
+          type: integer
+          minimum: 1
+        section_heading:
+          type: string
+        chunk_id:
+          type: string
+        snippet:
+          type: string
+        preview_url:
+          type: string
+        viewer_anchor:
+          type: string
+        scores:
+          $ref: '#/components/schemas/ScoreBreakdown'
+    SearchDocumentResult:
+      type: object
+      required:
+        - result_type
+        - document_id
+        - document_version_id
+        - title
+        - document_type
+      properties:
+        result_type:
+          type: string
+          enum: [document]
+        document_id:
+          type: string
+        document_version_id:
+          type: string
+        title:
+          type: string
+        document_type:
+          type: string
+        ticker:
+          type: string
+        publication_date:
+          type: string
+          format: date
+        source:
+          type: string
+        language:
+          type: string
+        preview_url:
+          type: string
+        scores:
+          $ref: '#/components/schemas/ScoreBreakdown'
+    ScoreBreakdown:
+      type: object
+      properties:
+        dense:
+          type: number
+          format: float
+        sparse:
+          type: number
+          format: float
+        rerank:
+          type: number
+          format: float
+    DocumentCollection:
+      type: object
+      required:
+        - page
+        - limit
+        - total
+        - data
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentResource'
+    DocumentAcceptedResponse:
+      type: object
+      required:
+        - document_id
+        - document_version_id
+        - index_job_id
+        - status
+      properties:
+        document_id:
+          type: string
+        document_version_id:
+          type: string
+        index_job_id:
+          type: string
+        status:
+          type: string
+          enum: [accepted]
+    DocumentResource:
+      type: object
+      required:
+        - document_id
+        - title
+        - document_type
+        - source
+        - language
+        - publication_date
+        - current_version_id
+        - access_level
+        - index_status
+      properties:
+        document_id:
+          type: string
+        title:
+          type: string
+        document_type:
+          type: string
+        ticker:
+          type: string
+        source:
+          type: string
+        language:
+          type: string
+        publication_date:
+          type: string
+          format: date
+        current_version_id:
+          type: string
+        access_level:
+          type: string
+        index_status:
+          type: string
+          enum: [accepted, indexing, indexed, failed, superseded]
+    DocumentVersionCollection:
+      type: object
+      required:
+        - document_id
+        - data
+      properties:
+        document_id:
+          type: string
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentVersionResource'
+    DocumentVersionResource:
+      type: object
+      required:
+        - document_id
+        - document_version_id
+        - version_label
+        - is_current_version
+        - publication_date
+        - parse_status
+      properties:
+        document_id:
+          type: string
+        document_version_id:
+          type: string
+        version_label:
+          type: string
+        is_current_version:
+          type: boolean
+        supersedes_version_id:
+          type: string
+          nullable: true
+        publication_date:
+          type: string
+          format: date
+        parse_status:
+          type: string
+          enum: [accepted, indexing, indexed, failed, withdrawn, invalidated, superseded]
+    PreviewResource:
+      type: object
+      required:
+        - document_id
+        - document_version_id
+        - page_number
+        - mime_type
+        - preview_url
+        - expires_at
+      properties:
+        document_id:
+          type: string
+        document_version_id:
+          type: string
+        page_number:
+          type: integer
+        mime_type:
+          type: string
+        preview_url:
+          type: string
+        viewer_anchor:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+    CitationResource:
+      type: object
+      required:
+        - citation_id
+        - document_id
+        - document_version_id
+        - title
+        - source
+        - document_type
+        - chunk_id
+        - snippet
+        - version_label
+      properties:
+        citation_id:
+          type: string
+        document_id:
+          type: string
+        document_version_id:
+          type: string
+        title:
+          type: string
+        source:
+          type: string
+        document_type:
+          type: string
+        page_number:
+          type: integer
+          minimum: 1
+        section_heading:
+          type: string
+        chunk_id:
+          type: string
+        snippet:
+          type: string
+        text_offset_start:
+          type: integer
+          minimum: 0
+        text_offset_end:
+          type: integer
+          minimum: 0
+        preview_url:
+          type: string
+        viewer_anchor:
+          type: string
+        version_label:
+          type: string
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+    ErrorEnvelope:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+            - request_id
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  issue:
+                    type: string
+            request_id:
+              type: string
+              format: uuid
