@@ -36,8 +36,7 @@
 
 | Capability | Description | Trigger | Output | Related Requirements |
 | --- | --- | --- | --- | --- |
-| Repository panel | Hien folder tree, upload, status | app load / upload | document tree | BR-FN-001 |
-| Version-aware upload | Upload file vao document dang chon de tao version moi | upload khi da chon document | append version status + refresh tree | BR-FN-001, BR-FN-007 |
+| Repository panel | Hien folder tree (Windows Explorer-like), create folder, upload file theo folder | app load / folder nav / upload | storage explorer + status | BR-FN-001 |
 | Query workspace | Nhap query, filters, xem answer | user submit | answer cards | BR-FN-003, BR-FN-004 |
 | Evidence panel | Hien snippets va preview | click citation/result | synced right panel | BR-FN-007 |
 | Voice draft | Ghi am co ban va do transcript vao composer | mic action | draft text | deferred-lite UX |
@@ -45,7 +44,10 @@
 
 - **Business Rules:**
   - Cột giữa la primary focus.
-  - Neu user da chon document trong repository panel, upload action phai gui `document_id` de append version.
+  - Repository panel la file-first explorer tren Firebase Storage, mapping truc tiep prefix object store:
+    - root prefix: `users/{uid}/repo/`
+    - folder tao bang placeholder object: `<path>/.keep`
+  - Upload action gui `folder_path` (relative) de luu file vao dung folder.
   - Click citation phai dong bo evidence item va preview target.
   - Left/right panels khong duoc chan luong query.
   - Empty/loading/error states phai ro thay vi de blank UI.
@@ -53,8 +55,8 @@
 
 ## 4. SEQUENCE OF OPERATIONS
 
-- **Primary Flow:** page load -> fetch documents -> user query -> render answer -> click citation -> hydrate preview -> sync right panel.
-- **Alternate / Exception Flows:** upload accepted nhung indexing chua xong -> left tree status `indexing`; preview fail -> fallback card + download action.
+- **Primary Flow:** page load -> fetch repository root listing -> user navigate folders / upload -> user query -> render answer -> click citation -> hydrate preview -> sync right panel.
+- **Alternate / Exception Flows:** upload failed -> show error + allow retry; preview fail -> fallback card + download action.
 - **Diagram:** [LLD-SPAI-FRONTEND-2026-003-Sequence_Diagram.md](./LLD-SPAI-FRONTEND-2026-003-Sequence_Diagram.md)
 
 ## 5. COMPONENT & CLASS DESIGN
@@ -76,13 +78,17 @@
   - `WorkspaceApi.search()`
   - `WorkspaceApi.getCitation()`
   - `WorkspaceApi.getPreview()`
-  - `WorkspaceApi.uploadDocument(file, documentId?)`
+  - `WorkspaceApi.listRepository(path?)`
+  - `WorkspaceApi.createFolder(path)`
+  - `WorkspaceApi.uploadRepositoryFile(file, folderPath?)`
 
 ## 6. INTERFACES & CONTRACTS
 
 | Interface | Consumer | Provider | Protocol | DTO / Payload | Notes |
 | --- | --- | --- | --- | --- | --- |
-| Workspace page data load | UI components | API client | HTTP/JSON | `DocumentCollection` | left panel |
+| Repository listing | Repository explorer | API client | HTTP/JSON | `RepositoryListingResponse` | list folders + files under path |
+| Folder create | Repository explorer | API client | HTTP/JSON | `CreateFolderRequest/Response` | `.keep` placeholder on object store |
+| Repository upload | Repository explorer | API client | multipart/form-data | `UploadRepositoryFileResponse` | upload into current folder |
 | Query submit | QueryComposer | API client | HTTP/JSON | `QueryRequest/Response` | center panel |
 | Citation hydrate | Evidence panel | API client | HTTP/JSON | `CitationResource` | right panel |
 | Preview load | Preview viewer | API client | HTTP/JSON | `PreviewResource` | signed URL aware |
