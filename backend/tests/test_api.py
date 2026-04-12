@@ -30,6 +30,31 @@ def patch_firebase_auth(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(auth_module, "verify_firebase_token", fake_verify)
     monkeypatch.setattr(services_module, "store_uploaded_source", lambda **kwargs: None)
 
+    # Repository browser endpoints are storage-backed in runtime.
+    # Tests keep them deterministic and offline.
+    class _Folder:
+        def __init__(self, name: str, path: str) -> None:
+            self.name = name
+            self.path = path
+
+    class _File:
+        def __init__(self, name: str, path: str) -> None:
+            self.name = name
+            self.path = path
+            self.size_bytes = 12
+            self.content_type = "text/plain"
+            self.updated_at = None
+
+    class _Listing:
+        def __init__(self, path: str) -> None:
+            self.path = path
+            self.folders = [_Folder("reports", "reports")]
+            self.files = [_File("readme.txt", "readme.txt")]
+
+    monkeypatch.setattr(services_module, "list_repository", lambda **kwargs: _Listing(kwargs.get("path") or ""))
+    monkeypatch.setattr(services_module, "create_folder", lambda **kwargs: _Folder("new", kwargs["path"]))
+    monkeypatch.setattr(services_module, "upload_file", lambda **kwargs: _File("upload.txt", "reports/upload.txt"))
+
 
 def test_healthcheck() -> None:
     response = client.get("/health")
@@ -209,3 +234,31 @@ def test_auth_me_returns_verified_firebase_principal() -> None:
     payload = response.json()
     assert payload["uid"] == "uid_analyst_001"
     assert payload["email"] == "analyst@actiwell.co"
+
+
+def test_repository_listing_supports_windows_explorer_tree() -> None:
+    response = client.get("/api/v1/repository", headers=AUTH_HEADERS)
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["path"] == ""
+    assert payload["folders"][0]["path"] == "reports"
+    assert payload["files"][0]["name"] == "readme.txt"
+
+
+def test_repository_create_folder() -> None:
+    response = client.post("/api/v1/repository/folders", json={"path": "reports/2026"}, headers=AUTH_HEADERS)
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["folder"]["path"] == "reports/2026"
+
+
+def test_repository_upload_file() -> None:
+    response = client.post(
+        "/api/v1/repository/files",
+        files={"file": ("upload.txt", BytesIO(b"hello"), "text/plain")},
+        data={"folder_path": "reports"},
+        headers=AUTH_HEADERS,
+    )
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["file"]["path"].endswith("upload.txt")

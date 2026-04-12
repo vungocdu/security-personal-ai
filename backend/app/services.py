@@ -7,6 +7,7 @@ from fastapi import HTTPException, UploadFile, status
 
 from app.auth import AuthenticatedUser
 from app.repositories import fixture_repository
+from app.repository_storage import RepositoryConfigError, create_folder, list_repository, upload_file
 from app.storage import StorageConfigError, store_uploaded_source
 from app.schemas import (
     AuthMeResponse,
@@ -142,6 +143,30 @@ class CitationService:
 class AuthService:
     def me(self, user: AuthenticatedUser) -> AuthMeResponse:
         return AuthMeResponse(uid=user.uid, email=user.email, name=user.name)
+
+
+@dataclass(slots=True)
+class RepositoryService:
+    def list(self, *, uid: str, path: str | None) -> "RepositoryListing":  # noqa: F821
+        return list_repository(uid=uid, path=path)
+
+    def create_folder(self, *, uid: str, path: str) -> "RepositoryFolder":  # noqa: F821
+        try:
+            return create_folder(uid=uid, path=path)
+        except ValueError as exc:
+            raise conflict("validation_error", str(exc))
+        except RepositoryConfigError as exc:
+            raise service_unavailable("repository_not_configured", str(exc))
+        except Exception as exc:  # pragma: no cover - external storage surface
+            raise service_unavailable("repository_folder_failed", f"{exc.__class__.__name__}")
+
+    def upload(self, *, uid: str, folder_path: str | None, upload: UploadFile) -> "RepositoryFile":  # noqa: F821
+        try:
+            return upload_file(uid=uid, folder_path=folder_path, upload=upload)
+        except RepositoryConfigError as exc:
+            raise service_unavailable("repository_not_configured", str(exc))
+        except Exception as exc:  # pragma: no cover - external storage surface
+            raise service_unavailable("repository_upload_failed", f"{exc.__class__.__name__}")
 
 
 def not_found(code: str, message: str) -> HTTPException:

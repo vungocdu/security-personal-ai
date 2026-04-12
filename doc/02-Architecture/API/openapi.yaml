@@ -15,6 +15,7 @@ tags:
   - name: Search
   - name: Documents
   - name: Citations
+  - name: Repository
 security:
   - bearerAuth: []
 paths:
@@ -330,6 +331,96 @@ paths:
           $ref: '#/components/responses/AuthForbidden'
         '404':
           $ref: '#/components/responses/ResourceNotFound'
+
+  /api/v1/repository:
+    get:
+      tags: [Repository]
+      summary: List repository nodes under a folder path
+      operationId: listRepository
+      parameters:
+        - name: path
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Relative folder path under the user's repository root.
+      responses:
+        '200':
+          description: Repository listing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryListingResponse'
+        '401':
+          $ref: '#/components/responses/AuthInvalidToken'
+        '403':
+          $ref: '#/components/responses/AuthForbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/repository/folders:
+    post:
+      tags: [Repository]
+      summary: Create a folder in repository
+      operationId: createRepositoryFolder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFolderRequest'
+      responses:
+        '201':
+          description: Folder created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateFolderResponse'
+        '401':
+          $ref: '#/components/responses/AuthInvalidToken'
+        '403':
+          $ref: '#/components/responses/AuthForbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/repository/files:
+    post:
+      tags: [Repository]
+      summary: Upload a file into a repository folder
+      operationId: uploadRepositoryFile
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                folder_path:
+                  type: string
+                  description: Relative folder path under the user's repository root.
+      responses:
+        '201':
+          description: File uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadRepositoryFileResponse'
+        '401':
+          $ref: '#/components/responses/AuthInvalidToken'
+        '403':
+          $ref: '#/components/responses/AuthForbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
 components:
   securitySchemes:
     bearerAuth:
@@ -910,6 +1001,68 @@ components:
           type: number
           minimum: 0
           maximum: 1
+    RepositoryFolderResource:
+      type: object
+      required: [name, path]
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+    RepositoryFileResource:
+      type: object
+      required: [name, path]
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        size_bytes:
+          type: integer
+          format: int64
+          nullable: true
+        content_type:
+          type: string
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+    RepositoryListingResponse:
+      type: object
+      required: [path, folders, files]
+      properties:
+        path:
+          type: string
+        folders:
+          type: array
+          items:
+            $ref: '#/components/schemas/RepositoryFolderResource'
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/RepositoryFileResource'
+    CreateFolderRequest:
+      type: object
+      required: [path]
+      properties:
+        path:
+          type: string
+          minLength: 1
+          maxLength: 500
+      additionalProperties: false
+    CreateFolderResponse:
+      type: object
+      required: [folder]
+      properties:
+        folder:
+          $ref: '#/components/schemas/RepositoryFolderResource'
+    UploadRepositoryFileResponse:
+      type: object
+      required: [file]
+      properties:
+        file:
+          $ref: '#/components/schemas/RepositoryFileResource'
     ErrorEnvelope:
       type: object
       required:

@@ -157,6 +157,33 @@ export interface AuthMeResponse {
   name?: string | null;
 }
 
+export interface RepositoryFolderResource {
+  name: string;
+  path: string;
+}
+
+export interface RepositoryFileResource {
+  name: string;
+  path: string;
+  size_bytes?: number | null;
+  content_type?: string | null;
+  updated_at?: string | null;
+}
+
+export interface RepositoryListingResponse {
+  path: string;
+  folders: RepositoryFolderResource[];
+  files: RepositoryFileResource[];
+}
+
+export interface CreateFolderResponse {
+  folder: RepositoryFolderResource;
+}
+
+export interface UploadRepositoryFileResponse {
+  file: RepositoryFileResource;
+}
+
 export interface RepositoryNode {
   id: string;
   label: string;

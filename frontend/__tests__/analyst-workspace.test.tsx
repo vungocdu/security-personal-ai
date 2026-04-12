@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { AnalystWorkspace } from "@/components/workspace/analyst-workspace";
@@ -8,7 +8,7 @@ describe("AnalystWorkspace", () => {
     render(<AnalystWorkspace />);
 
     await waitFor(() => {
-      expect(screen.getByText("Document tree")).toBeInTheDocument();
+      expect(screen.getByText("Firebase Storage Explorer")).toBeInTheDocument();
     });
 
     expect(screen.getByText("Evidence-first query thread")).toBeInTheDocument();
@@ -44,25 +44,26 @@ describe("AnalystWorkspace", () => {
 
   it("shows mobile panel controls", async () => {
     render(<AnalystWorkspace />);
-    await waitFor(() => expect(screen.getByText("Document tree")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Firebase Storage Explorer")).toBeInTheDocument());
 
     expect(screen.getByLabelText("Open left panel")).toBeInTheDocument();
     expect(screen.getByLabelText("Open right panel")).toBeInTheDocument();
   });
 
-  it("uploads into selected logical document as a new version", async () => {
+  it("uploads a file into the selected repository folder", async () => {
     const user = userEvent.setup();
     const { container } = render(<AnalystWorkspace />);
-    await waitFor(() => expect(screen.getByText("Document tree")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Firebase Storage Explorer")).toBeInTheDocument());
 
-    await user.click(screen.getByRole("button", { name: /HPG Annual Report 2024/i }));
+    const tree = screen.getByTestId("repository-folder-tree");
+    await user.click(within(tree).getByRole("button", { name: "Reports" }));
 
     const uploadInput = container.querySelector('input[type="file"]');
     expect(uploadInput).not.toBeNull();
     await user.upload(uploadInput as HTMLInputElement, new File(["fixture"], "hpg-amended.pdf", { type: "application/pdf" }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Appended version: doc_hpg_ar_2024 -> docver_hpg_ar_2024_v99/i)).toBeInTheDocument();
+      expect(screen.getByText(/Uploaded: Reports\/hpg-amended\.pdf/i)).toBeInTheDocument();
     });
   });
 });

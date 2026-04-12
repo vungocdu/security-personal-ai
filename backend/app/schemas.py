@@ -230,5 +230,36 @@ class ErrorEnvelope(StrictModel):
     error: ErrorBody
 
 
+class RepositoryFolderResource(StrictModel):
+    name: str
+    path: str
+
+
+class RepositoryFileResource(StrictModel):
+    name: str
+    path: str
+    size_bytes: int | None = None
+    content_type: str | None = None
+    updated_at: datetime | None = None
+
+
+class RepositoryListingResponse(StrictModel):
+    path: str
+    folders: list[RepositoryFolderResource]
+    files: list[RepositoryFileResource]
+
+
+class CreateFolderRequest(StrictModel):
+    path: str = Field(min_length=1, max_length=500)
+
+
+class CreateFolderResponse(StrictModel):
+    folder: RepositoryFolderResource
+
+
+class UploadRepositoryFileResponse(StrictModel):
+    file: RepositoryFileResource
+
+
 def new_request_id() -> str:
     return str(uuid4())
