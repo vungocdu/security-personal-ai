@@ -57,7 +57,7 @@ async def upload_document(
     source: str | None = Form(default=None),
 ) -> DocumentAcceptedResponse:
     return service.upload_document(
-        filename=file.filename or "uploaded-document",
+        upload=file,
         document_id=document_id,
         document_type=document_type,
         ticker=ticker,

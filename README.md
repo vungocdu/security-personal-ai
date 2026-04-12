@@ -97,6 +97,7 @@ firebase use actiwell-74477
 ```bash
 AUTH_ENFORCE=true
 FIREBASE_PROJECT_ID=actiwell-74477
+FIREBASE_STORAGE_BUCKET=actiwell-74477.firebasestorage.app
 FIREBASE_SERVICE_ACCOUNT_JSON='{"type":"service_account", ...}'
 ```
 

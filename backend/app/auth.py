@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from functools import lru_cache
-
 import firebase_admin
 from firebase_admin import auth as firebase_auth
-from firebase_admin import credentials
 from fastapi import Header, HTTPException, status
 
 from app.config import AppConfig, load_config
+from app.firebase import firebase_app
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,26 +17,6 @@ class AuthenticatedUser:
     name: str | None
 
 
-def _build_firebase_credential(config: AppConfig):
-    if config.firebase_service_account_json:
-        service_account_info = json.loads(config.firebase_service_account_json)
-        return credentials.Certificate(service_account_info)
-    if config.firebase_service_account_path:
-        return credentials.Certificate(config.firebase_service_account_path)
-    return credentials.ApplicationDefault()
-
-
-@lru_cache(maxsize=1)
-def _firebase_app() -> firebase_admin.App:
-    config = load_config()
-    options = {"projectId": config.firebase_project_id} if config.firebase_project_id else None
-    credential = _build_firebase_credential(config)
-    try:
-        return firebase_admin.get_app()
-    except ValueError:
-        return firebase_admin.initialize_app(credential=credential, options=options)
-
-
 def verify_firebase_token(token: str, config: AppConfig | None = None) -> AuthenticatedUser | None:
     settings = config or load_config()
     if not settings.auth_enforce:
@@ -46,7 +24,7 @@ def verify_firebase_token(token: str, config: AppConfig | None = None) -> Authen
     if not token:
         return None
     try:
-        decoded = firebase_auth.verify_id_token(token, app=_firebase_app())
+        decoded = firebase_auth.verify_id_token(token, app=firebase_app())
     except (
         firebase_auth.ExpiredIdTokenError,
         firebase_auth.InvalidIdTokenError,

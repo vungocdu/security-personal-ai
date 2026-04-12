@@ -3,10 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, UploadFile, status
 
 from app.auth import AuthenticatedUser
 from app.repositories import fixture_repository
+from app.storage import StorageConfigError, store_uploaded_source
 from app.schemas import (
     AuthMeResponse,
     CitationResource,
@@ -66,7 +67,7 @@ class DocumentService:
     def upload_document(
         self,
         *,
-        filename: str,
+        upload: UploadFile,
         document_id: str | None,
         document_type: str | None,
         ticker: str | None,
@@ -76,8 +77,8 @@ class DocumentService:
     ) -> DocumentAcceptedResponse:
         if document_id and fixture_repository.get_document(document_id) is None:
             raise not_found("document_not_found", f"Document '{document_id}' was not found.")
-        return fixture_repository.upload_document(
-            filename=filename,
+        accepted = fixture_repository.upload_document(
+            filename=upload.filename or "uploaded-document",
             document_id=document_id,
             document_type=document_type,
             ticker=ticker,
@@ -85,6 +86,18 @@ class DocumentService:
             publication_date=publication_date,
             source=source,
         )
+        try:
+            store_uploaded_source(
+                upload=upload,
+                document_id=accepted.document_id,
+                document_version_id=accepted.document_version_id,
+            )
+        except StorageConfigError as exc:
+            raise service_unavailable("storage_not_configured", str(exc))
+        except Exception as exc:  # pragma: no cover - external storage surface
+            raise service_unavailable("storage_upload_failed", f"{exc.__class__.__name__}")
+
+        return accepted
 
     def get_document(self, document_id: str) -> DocumentResource:
         document = fixture_repository.get_document(document_id)
@@ -144,3 +157,9 @@ def conflict(code: str, message: str) -> HTTPException:
         detail={"code": code, "message": message},
     )
 
+
+def service_unavailable(code: str, message: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail={"code": code, "message": message},
+    )

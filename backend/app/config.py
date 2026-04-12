@@ -13,6 +13,8 @@ class AppConfig:
     firebase_project_id: str | None
     firebase_service_account_json: str | None
     firebase_service_account_path: str | None
+    firebase_storage_bucket: str | None
+    preview_url_ttl_minutes: int
 
 
 def _as_bool(raw: str | None, *, default: bool) -> bool:
@@ -30,6 +32,14 @@ def load_config() -> AppConfig:
     if timeout <= 0:
         timeout = 10.0
 
+    preview_ttl_raw = (os.getenv("PREVIEW_URL_TTL_MINUTES") or "15").strip()
+    try:
+        preview_ttl_minutes = int(preview_ttl_raw)
+    except ValueError:
+        preview_ttl_minutes = 15
+    if preview_ttl_minutes <= 0:
+        preview_ttl_minutes = 15
+
     return AppConfig(
         qdrant_url=(os.getenv("QDRANT_URL") or "").strip() or None,
         qdrant_api_key=(os.getenv("QDRANT_API_KEY") or "").strip() or None,
@@ -38,4 +48,6 @@ def load_config() -> AppConfig:
         firebase_project_id=(os.getenv("FIREBASE_PROJECT_ID") or "").strip() or None,
         firebase_service_account_json=(os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON") or "").strip() or None,
         firebase_service_account_path=(os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH") or "").strip() or None,
+        firebase_storage_bucket=(os.getenv("FIREBASE_STORAGE_BUCKET") or "").strip() or None,
+        preview_url_ttl_minutes=preview_ttl_minutes,
     )

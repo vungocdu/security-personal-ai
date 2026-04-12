@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import app.auth as auth_module
+import app.services as services_module
 from app.main import app
 
 
@@ -27,6 +28,7 @@ def patch_firebase_auth(monkeypatch: pytest.MonkeyPatch) -> None:
         return None
 
     monkeypatch.setattr(auth_module, "verify_firebase_token", fake_verify)
+    monkeypatch.setattr(services_module, "store_uploaded_source", lambda **kwargs: None)
 
 
 def test_healthcheck() -> None:

@@ -186,7 +186,7 @@ Trust boundary chính:
 | API Gateway | FastAPI + Firebase Admin SDK | Verify Firebase ID token, authorization, query endpoint, document APIs, citation payload formatting |
 | Orchestrator Service | LangGraph-based Python service | Intent classification nhẹ, entity extraction, filter builder, retrieval orchestration, rerank, synthesis, response validation |
 | Ingestion Worker | Python background worker | Parsing, OCR orchestration, cleaning, chunking, metadata enrichment, embedding, indexing |
-| Object Storage | S3/R2/MinIO | Lưu file gốc và preview artifacts |
+| Object Storage | Firebase Storage (GCS bucket) | Lưu file gốc và preview artifacts; preview/download dùng signed URL short-lived |
 | Metadata Database | PostgreSQL | Document registry, source registry, company/ticker mapping, user permission, indexing status, citation metadata |
 | Vector Store | Qdrant | Chunk embeddings, chunk payload metadata, semantic retrieval index |
 | Observability Stack | Langfuse + structured application logs | AI traces, latency/cost metrics, operational monitoring for MVP |
@@ -280,7 +280,7 @@ Trust boundary chính:
 #### Document Ingestion Flow
 
 1. User upload file hoặc batch import tài liệu.
-2. Hệ thống lưu file gốc vào object storage.
+2. Hệ thống lưu file gốc vào Firebase Storage (bucket mặc định `{projectId}.firebasestorage.app`), theo đường dẫn version-aware.
 3. Ingestion worker parse nội dung hoặc gọi OCR nếu cần.
 4. Cleaner/Normalizer chuẩn hóa text và cấu trúc.
 5. Structural Chunker chia tài liệu theo section nghiệp vụ.
@@ -348,11 +348,11 @@ Trust boundary chính:
 
 - PostgreSQL lưu registry, status, metadata nghiệp vụ, access control và citation mapping metadata.
 - Qdrant lưu embedding của chunk cùng payload cần cho retrieval.
-- Object storage lưu file gốc, preview image/page artifact, OCR intermediate nếu cần.
+- Firebase Storage lưu file gốc, preview image/page artifact, OCR intermediate nếu cần.
 
 **Integration flows:**
 
-- Ingestion worker ghi object storage trước, sau đó parse/chunk/enrich và ghi PostgreSQL + Qdrant.
+- Upload/ingestion ghi Firebase Storage trước (version-aware path), sau đó parse/chunk/enrich và ghi PostgreSQL + Qdrant.
 - Query runtime đọc metadata/access policy từ PostgreSQL và context chunks từ Qdrant.
 
 ### 8.3 Metadata Contract
@@ -477,7 +477,7 @@ Trust boundary chính:
 | Layer | Control | Notes |
 | --- | --- | --- |
 | In transit | TLS for browser, service-to-service encryption | Bắt buộc cho mọi môi trường ngoài local dev |
-| At rest | Encryption for object storage, PostgreSQL, Qdrant volumes | Managed KMS hoặc equivalent |
+| At rest | Encryption for Firebase Storage (GCS), PostgreSQL, Qdrant volumes | Managed KMS hoặc equivalent |
 | Data minimization | Không lưu query history trong Phase 1; log chỉ giữ technical metadata cần thiết | Giảm rủi ro privacy và retention |
 
 ### 9.4 Logging, Monitoring, & Incident Response
@@ -669,6 +669,7 @@ Trust boundary chính:
 - **Logging:** structured logs theo request/job/document identifiers.
 - **Metrics:** query latency, retrieval latency, rerank latency, generation latency, indexing latency, token usage, cost per query, citation coverage, error rate, lấy từ application logs và Langfuse traces.
 - **Alerts:** MVP chỉ cần cảnh báo cho index pipeline failure, provider timeout spike, vector store outage.
+- **Storage controls:** preview/download URLs phải là signed URL short-lived; TTL mặc định cấu hình qua `PREVIEW_URL_TTL_MINUTES`.
 
 **MVP note:** Chưa cần Prometheus, Grafana hoặc observability platform riêng ngoài Langfuse và log của ứng dụng. Nếu pilot chứng minh có nhu cầu scale vận hành, các stack này mới được xem xét ở giai đoạn sau.
 
@@ -728,7 +729,7 @@ Trust boundary chính:
 
 | Version | Date | Author | Summary |
 | --- | --- | --- | --- |
-| 0.4 | 2026-04-12 | OpenAI Codex | Added Firebase Auth architecture decision, token trust boundary, and shared Actiwell project alignment |
+| 0.4 | 2026-04-12 | OpenAI Codex | Added Firebase Auth architecture decision, token trust boundary, and Firebase Storage alignment for uploaded files |
 | 0.3 | 2026-04-12 | OpenAI Codex | Added metadata contract, mandatory versioning, hybrid retrieval/rerank contract, citation preview contract |
 | 0.2 | 2026-04-12 | OpenAI Codex | Initial architecture draft aligned to Phase 1 query-first scope |
 
