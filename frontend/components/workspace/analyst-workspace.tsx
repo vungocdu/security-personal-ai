@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { RepositoryExplorer } from "@/components/workspace/repository-explorer";
 import { workspaceApi } from "@/lib/api";
@@ -85,30 +85,24 @@ export function AnalystWorkspace() {
         </header>
 
         <div className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)_460px]">
-          <PanelShell title="Repository" icon={<FolderTree className="h-4 w-4" />} mobileOpen={panelView === "left"} onClose={() => setPanelView("desktop")} className="xl:block">
+          <PanelShell title="Files" icon={<FolderTree className="h-4 w-4" />} mobileOpen={panelView === "left"} onClose={() => setPanelView("desktop")} className="xl:block">
             <RepositoryExplorer />
           </PanelShell>
 
-          <PanelShell title="Query workspace" icon={<Search className="h-4 w-4" />} mobileOpen className="xl:block">
+          <PanelShell title="Query" icon={<Search className="h-4 w-4" />} mobileOpen className="xl:block">
             <div className="flex flex-wrap gap-2">
               {FILTER_SUMMARY.map((item) => (
                 <Badge key={item}>{item}</Badge>
               ))}
             </div>
             <Card className="mt-4 overflow-hidden bg-white/90">
-              <CardHeader>
-                <CardTitle>Evidence-first query thread</CardTitle>
-                <CardDescription>
-                  Ask in natural language, then verify each point from the right-hand evidence panel.
-                </CardDescription>
-              </CardHeader>
               <CardContent className="space-y-4">
-                  <div className="rounded-2xl bg-ink p-4 text-sm text-white">
-                    <p className="text-xs uppercase tracking-[0.24em] text-white/60">Prompt</p>
-                    <p className="mt-2" data-testid="current-prompt">
-                      {queryText}
-                    </p>
-                  </div>
+                <div className="rounded-2xl bg-ink p-4 text-sm text-white">
+                  <p className="text-xs uppercase tracking-[0.24em] text-white/60">Prompt</p>
+                  <p className="mt-2" data-testid="current-prompt">
+                    {queryText}
+                  </p>
+                </div>
                 {error ? (
                   <div className="rounded-2xl border border-[#efc5c5] bg-[#fff4f4] p-4 text-sm text-[#8f3131]">{error}</div>
                 ) : null}
@@ -140,17 +134,13 @@ export function AnalystWorkspace() {
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-line bg-white/60 p-6 text-sm text-slate">
-                    Try prompts like “Tổng hợp các rủi ro chính của VNM trong 3 báo cáo thường niên gần nhất”.
+                    Try a company risk question.
                   </div>
                 )}
               </CardContent>
             </Card>
 
             <Card className="mt-4 bg-white/95">
-              <CardHeader>
-                <CardTitle>Composer</CardTitle>
-                <CardDescription>Center panel remains primary on every screen size.</CardDescription>
-              </CardHeader>
               <CardContent>
                 <Textarea value={queryText} onChange={(event) => setQueryText(event.target.value)} aria-label="Query input" />
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
@@ -170,12 +160,8 @@ export function AnalystWorkspace() {
             </Card>
           </PanelShell>
 
-          <PanelShell title="Evidence preview" icon={<FileText className="h-4 w-4" />} mobileOpen={panelView === "right"} onClose={() => setPanelView("desktop")} className="xl:block">
+          <PanelShell title="Evidence" icon={<FileText className="h-4 w-4" />} mobileOpen={panelView === "right"} onClose={() => setPanelView("desktop")} className="xl:block">
             <Card className="bg-white/92">
-              <CardHeader>
-                <CardTitle>Snippet stack</CardTitle>
-                <CardDescription>Right panel stays tied to citations and search evidence.</CardDescription>
-              </CardHeader>
               <CardContent className="space-y-3" data-testid="evidence-panel">
                 {activeResponse?.citations.map((citation) => {
                   const active = activeEvidence?.id === citation.citation_id;
@@ -199,17 +185,13 @@ export function AnalystWorkspace() {
                   );
                 }) ?? (
                   <div className="rounded-2xl border border-dashed border-line bg-white/70 p-5 text-sm text-slate">
-                    Select a citation to preview the source file here.
+                    Select a citation.
                   </div>
                 )}
               </CardContent>
             </Card>
 
             <Card className="mt-4 min-h-[360px] bg-[#fcfcfd]">
-              <CardHeader>
-                <CardTitle>{activeEvidence?.title ?? "Preview viewer"}</CardTitle>
-                <CardDescription>{activeEvidence?.subtitle ?? "PDF, Word, and Excel previews will appear here."}</CardDescription>
-              </CardHeader>
               <CardContent data-testid="preview-panel">
                 {activeEvidence ? <PreviewSurface evidence={activeEvidence} /> : <div className="rounded-2xl bg-mist p-6 text-sm text-slate">No evidence selected.</div>}
               </CardContent>
@@ -245,9 +227,9 @@ function PanelShell({
       )}
     >
       <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm font-semibold text-ink">
+        <div className="flex items-center gap-2 text-sm font-semibold text-ink" aria-label={title}>
           {icon}
-          <span>{title}</span>
+          <span className="sr-only">{title}</span>
         </div>
         {onClose ? (
           <Button variant="ghost" size="sm" className="xl:hidden" type="button" onClick={onClose}>
@@ -289,14 +271,13 @@ function PreviewSurface({ evidence }: { evidence: EvidenceItem }) {
       <div className="rounded-3xl border border-dashed border-line bg-mist/60 p-5 text-sm text-slate">
         {preview && preview.preview_url.includes("signed.example.com") ? (
           <>
-            Interactive preview is unavailable in fixture mode. This panel is ready to load the signed preview URL from backend when
-            `NEXT_PUBLIC_API_BASE_URL` is configured.
+            Preview is unavailable in fixture mode.
             <div className="mt-3 break-all text-xs text-slate">{preview.preview_url}</div>
           </>
         ) : preview ? (
           <iframe className="min-h-[320px] w-full rounded-2xl border border-line" src={preview.preview_url} title={evidence.title} />
         ) : (
-          "Preview artifact is not ready. The user can still inspect citation metadata and use the download action."
+          "Preview is not ready."
         )}
       </div>
       <div className="flex flex-wrap gap-2">

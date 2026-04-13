@@ -8,11 +8,11 @@ describe("AnalystWorkspace", () => {
     render(<AnalystWorkspace />);
 
     await waitFor(() => {
-      expect(screen.getByText("Firebase Storage Explorer")).toBeInTheDocument();
+      expect(screen.getByLabelText("Files")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Evidence-first query thread")).toBeInTheDocument();
-    expect(screen.getByText("Snippet stack")).toBeInTheDocument();
+    expect(screen.getByLabelText("Query")).toBeInTheDocument();
+    expect(screen.getByLabelText("Evidence")).toBeInTheDocument();
   });
 
   it("runs a query and syncs the selected citation into the preview panel", async () => {
@@ -44,7 +44,7 @@ describe("AnalystWorkspace", () => {
 
   it("shows mobile panel controls", async () => {
     render(<AnalystWorkspace />);
-    await waitFor(() => expect(screen.getByText("Firebase Storage Explorer")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByLabelText("Files")).toBeInTheDocument());
 
     expect(screen.getByLabelText("Open left panel")).toBeInTheDocument();
     expect(screen.getByLabelText("Open right panel")).toBeInTheDocument();
@@ -53,7 +53,7 @@ describe("AnalystWorkspace", () => {
   it("uploads a file into the selected repository folder", async () => {
     const user = userEvent.setup();
     const { container } = render(<AnalystWorkspace />);
-    await waitFor(() => expect(screen.getByText("Firebase Storage Explorer")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByLabelText("Files")).toBeInTheDocument());
 
     const tree = screen.getByTestId("repository-folder-tree");
     await user.click(within(tree).getByRole("button", { name: "Reports" }));
