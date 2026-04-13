@@ -32,3 +32,13 @@ curl http://127.0.0.1:8000/health
 - GitHub Actions workflow: `.github/workflows/ci.yml`
 - Backend smoke check: `python -c "from app.main import app; print(app.title)"`
 - OpenAPI validation: parse `doc/02-Architecture/API/openapi.yaml`
+
+## Deploy Configuration (configured by /setup-deploy)
+
+- Platform: Vercel
+- Deploy workflow: auto-deploy on git push (Preview on PR, Production on merge)
+- Backend project: `security-personal-ai-backend` (root: `backend`)
+- Frontend project: `frontend` (root: `frontend`)
+- Backend health check: `https://security-personal-ai-backend.vercel.app/health`
+- Backend dependency check: `https://security-personal-ai-backend.vercel.app/health/dependencies`
+- Frontend URL: `https://frontend-psi-lyart-46.vercel.app/`

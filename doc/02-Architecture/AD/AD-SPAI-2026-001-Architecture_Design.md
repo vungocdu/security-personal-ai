@@ -12,7 +12,7 @@
 | --- | --- |
 | **Project** | Security Personal AI |
 | **System / Component** | Securities Research Document Intelligence Platform |
-| **Document Version** | 0.3 Draft |
+| **Document Version** | 0.5 Draft |
 | **Status** | Draft |
 | **Classification** | Confidential |
 | **Author** | OpenAI Codex, AI Architecture Draft |
@@ -42,7 +42,7 @@
 ## 1. Executive Summary
 
 **Solution Overview:**  
-Hệ thống được thiết kế như một nền tảng RAG chuyên biệt cho chuyên gia chứng khoán để truy vấn kho tài liệu nghiệp vụ bằng ngôn ngữ tự nhiên, trả lời có citation và cho phép kiểm chứng nguồn ở cấp tài liệu, trang và đoạn. Kiến trúc Phase 1 theo hướng query-first, ưu tiên ingest, indexing, hybrid retrieval, metadata filtering, reranking, answer synthesis và citation preview. Bản v0.3 bổ sung metadata contract tối thiểu, mandatory document versioning, retrieval/rerank contract và citation preview contract để team có thể triển khai nhất quán, đồng thời giữ MVP ở trạng thái tối giản, không yêu cầu thêm observability stack nặng ngoài Langfuse và structured application logs. Các năng lực như query history, workspace, watchlist, alerts và analytics người dùng chưa đưa vào baseline giai đoạn này.
+Hệ thống được thiết kế như một nền tảng RAG chuyên biệt cho chuyên gia chứng khoán để truy vấn kho tài liệu nghiệp vụ bằng ngôn ngữ tự nhiên, trả lời có citation và cho phép kiểm chứng nguồn ở cấp tài liệu, trang và đoạn. Kiến trúc Phase 1 theo hướng query-first, ưu tiên ingest, indexing, hybrid retrieval, metadata filtering, reranking, answer synthesis và citation preview. Bản v0.4 giữ nguyên retrieval core và bổ sung trust boundary xác thực bằng Firebase Auth (Email/Password sign-in ở frontend, Firebase ID token verification ở backend) để đồng bộ với hướng triển khai Vercel và project dùng chung Actiwell (`actiwell-74477`). Các năng lực như query history, workspace, watchlist, alerts và analytics người dùng chưa đưa vào baseline giai đoạn này.
 
 **Highlights / Key Changes:**
 
@@ -50,6 +50,7 @@ Hệ thống được thiết kế như một nền tảng RAG chuyên biệt ch
 - Tách rõ năng lực Phase 1 và các hạng mục deferred để tránh loãng retrieval core.
 - Giữ security enforcement ở retrieval stage, không chỉ ở tầng UI hoặc post-filter.
 - Bổ sung contract đủ chi tiết cho metadata, versioning, hybrid retrieval và citation preview.
+- Chuẩn hóa xác thực qua Firebase Auth để backend không phụ thuộc credential local tự quản lý.
 
 **Compliance Status:**
 
@@ -168,7 +169,7 @@ Hệ thống nằm giữa người dùng nghiệp vụ và kho tài liệu chuy�
 - Chuyên gia chứng khoán dùng web UI để hỏi bằng văn bản và kiểm tra citation.
 - System administrator quản lý user, quyền truy cập và tình trạng indexing.
 - Nguồn tài liệu vào gồm upload thủ công và batch import đơn giản từ repository nội bộ hoặc thư mục được chỉ định.
-- Identity provider cung cấp xác thực và thông tin vai trò người dùng.
+- Firebase Authentication (project `actiwell-74477`) cung cấp xác thực Email/Password và Google sign-in (SSO), phát hành ID token cho frontend.
 - Monitoring/logging platform nhận trace, metric, log kỹ thuật.
 
 Trust boundary chính:
@@ -181,14 +182,20 @@ Trust boundary chính:
 
 | Container | Technology Direction | Responsibility |
 | --- | --- | --- |
-| Web Application | Next.js | Query input, metadata filters, citation list, preview, upload UI, indexing status |
-| API Gateway | FastAPI | Authentication, authorization, query endpoint, document APIs, citation payload formatting |
+| Web Application | Next.js + Firebase Web SDK | Query input, metadata filters, citation list, preview, upload UI, indexing status, sign-in Email/Password (+ Google sign-in) |
+| API Gateway | FastAPI + Firebase Admin SDK | Verify Firebase ID token, authorization, query endpoint, document APIs, citation payload formatting |
 | Orchestrator Service | LangGraph-based Python service | Intent classification nhẹ, entity extraction, filter builder, retrieval orchestration, rerank, synthesis, response validation |
 | Ingestion Worker | Python background worker | Parsing, OCR orchestration, cleaning, chunking, metadata enrichment, embedding, indexing |
-| Object Storage | S3/R2/MinIO | Lưu file gốc và preview artifacts |
+| Market Data MCP Server (Phase 2 planned) | Python + FastMCP (stdio transport) | Bộ tools chuẩn hoá truy xuất dữ liệu thị trường từ TCBS Public API (OHLCV lịch sử, báo cáo tài chính doanh nghiệp, danh sách ticker, thông tin công ty). Chạy như subprocess của Market Data Ingestion Worker, không cần deploy service thường trực. |
+| Market Data Ingestion Worker (Phase 2 planned) | Python script, GitHub Actions scheduled workflow | Trigger EOD (ví dụ 18:30 ICT ngày giao dịch). Gọi MCP Server tools, transform dữ liệu thị trường thành document chunks theo metadata contract, embed và index vào PostgreSQL + Qdrant. |
+| Object Storage | Firebase Storage (GCS bucket) | Lưu file gốc và preview artifacts; preview/download dùng signed URL short-lived |
 | Metadata Database | PostgreSQL | Document registry, source registry, company/ticker mapping, user permission, indexing status, citation metadata |
 | Vector Store | Qdrant | Chunk embeddings, chunk payload metadata, semantic retrieval index |
 | Observability Stack | Langfuse + structured application logs | AI traces, latency/cost metrics, operational monitoring for MVP |
+
+Operational note (browser-based deployments):
+
+- Khi frontend deploy tren domain khac backend (Vercel preview/prod), API Gateway phai duoc cau hinh CORS allowlist (env `CORS_ALLOW_ORIGINS` hoac `CORS_ALLOW_ORIGIN_REGEX`) de preflight/requests tu browser hop le.
 
 ### 6.4 Component View
 
@@ -201,7 +208,7 @@ Trust boundary chính:
 
 #### Application/API Layer
 
-- Auth Controller: xác thực và nạp access scope.
+- Auth Controller: verify Firebase ID token, ánh xạ principal (`uid`, `email`) và nạp access scope.
 - Query Controller: nhận query request, tạo trace, gọi orchestrator.
 - Document Controller: upload, list, get status, reindex.
 - Citation Controller: chuẩn hóa citation payload cho UI preview.
@@ -279,7 +286,7 @@ Trust boundary chính:
 #### Document Ingestion Flow
 
 1. User upload file hoặc batch import tài liệu.
-2. Hệ thống lưu file gốc vào object storage.
+2. Hệ thống lưu file gốc vào Firebase Storage (GCS bucket cấu hình qua `FIREBASE_STORAGE_BUCKET` và phải tồn tại), theo đường dẫn version-aware.
 3. Ingestion worker parse nội dung hoặc gọi OCR nếu cần.
 4. Cleaner/Normalizer chuẩn hóa text và cấu trúc.
 5. Structural Chunker chia tài liệu theo section nghiệp vụ.
@@ -289,6 +296,28 @@ Trust boundary chính:
 9. Index Writer ghi metadata vào PostgreSQL và vectors vào Qdrant.
 10. Validation kiểm tra chunk rỗng, parse success rate, metadata tối thiểu.
 11. Document status được cập nhật sang indexed hoặc failed.
+
+#### Market Data Ingestion Flow (EOD Automated)
+
+Scope note: Đây là extension dự kiến cho Phase 2 (không thuộc Phase 1 query foundation). Mục tiêu là đảm bảo analyst có thể truy vấn cả tài liệu upload lẫn dữ liệu thị trường/financial theo kỳ.
+
+Trigger: GitHub Actions Cron theo EOD (ví dụ 18:30 ICT ngày giao dịch, sau giờ đóng cửa).
+
+1. GitHub Actions khởi động Market Data Ingestion Worker (Python script).
+2. Worker đọc danh sách ticker cần crawl từ bảng `ticker_registry` trong PostgreSQL.
+3. Worker khởi tạo MCP Server (FastMCP) theo stdio transport như một subprocess trong cùng process.
+4. Worker gọi MCP tool `get_ohlcv(ticker, from_date, to_date)` → nhận OHLCV EOD theo ngày từ TCBS Public API (`apipubaws.tcbs.com.vn/stock-insight/v1/stock/his-price`).
+5. Worker gọi MCP tool `get_financial_report(ticker, period)` → nhận báo cáo tài chính (IS/BS/CF) từ TCBS tcanalysis API (`apipubaws.tcbs.com.vn/tcanalysis/v1/finance/{ticker}/financialreport`). Chỉ crawl lại nếu có kỳ báo cáo mới so với lần crawl trước.
+6. MCP Server trả JSON chuẩn hoá — Worker transform sang Document schema hiện tại:
+   - **OHLCV**: Mỗi tháng dữ liệu giá = một document chunk dạng markdown table, `document_type = "market_price_history"`.
+   - **Báo cáo tài chính**: Mỗi kỳ (quý/năm) = một document, `document_type = "financial_statement"`, các chỉ tiêu được serialise thành structured text để retrieval.
+7. Metadata Enricher gắn `ticker`, `company_name`, `sector`, `market`, `reporting_period`, `fiscal_year`, `quarter`, `publication_date`, `source = "tcbs_api"`, `access_level = "internal"`.
+8. Embedding Adapter sinh vector. Sparse Retrieval Adapter index ticker/số liệu/kỳ báo cáo.
+9. Index Writer ghi vào PostgreSQL (document registry) và Qdrant (chunk embeddings).
+10. Worker log kết quả (số ticker crawl thành công/thất bại, số document mới/đã tồn tại) vào structured application log.
+11. Nếu TCBS API trả lỗi cho một ticker, worker bỏ qua ticker đó, ghi trạng thái `failed` và tiếp tục các ticker còn lại — không dừng toàn bộ job.
+
+**Note:** MCP Server không deploy thường trực — chỉ sống trong vòng đời của mỗi lần chạy GitHub Actions workflow. Khi cần agent/orchestrator gọi trực tiếp (Phase 2+), MCP Server có thể chuyển sang SSE/HTTP transport mà không thay đổi tool interface.
 
 ### 6.7 Cross-cutting Concerns
 
@@ -311,6 +340,10 @@ Trust boundary chính:
 | ADR-0007 | Hybrid retrieval phải gồm dense + sparse + metadata filter + fusion + rerank | Accepted | Tránh trượt về vector search thuần, tăng precision cho ticker, pháp lý và thuật ngữ tài chính | Cần định nghĩa retrieval contract và scoring pipeline rõ ràng |
 | ADR-0008 | Document versioning là bắt buộc ngay từ Phase 1 | Accepted | Tài liệu chứng khoán có bản sửa đổi, cập nhật, revised report, amended filing | Citation và retrieval phải luôn tham chiếu bản hiệu lực đúng |
 | ADR-0009 | Citation preview phải support page-level và chunk-level anchor | Accepted | User cần bấm citation và thấy đúng bằng chứng, không chỉ mở đúng file | Cần preview artifacts, text offset mapping và API payload chuẩn |
+| ADR-0010 | Chuẩn hóa authentication qua Firebase Auth project dùng chung Actiwell | Accepted | Loại bỏ credential local tự quản lý, đồng bộ với deployment Vercel và trust boundary cloud | Backend phải verify ID token bằng Firebase Admin SDK và quản lý service account secret ở backend env |
+| ADR-0011 | Dùng TCBS Public API làm nguồn dữ liệu thị trường thay vì crawl website | Accepted (Phase 2 planned) | TCBS cung cấp OHLCV lịch sử + báo cáo tài chính theo API (không cần auth) ở dạng JSON, phù hợp cho EOD ingestion (Phase 2) | Dữ liệu phụ thuộc unofficial API; cần monitor schema change, rate limit và rủi ro gián đoạn |
+| ADR-0012 | Market Data MCP Server dùng stdio transport, chạy như subprocess trong ingestion worker | Accepted (Phase 2 planned) | EOD ingestion chạy trong GitHub Actions ephemeral environment, không cần HTTP server thường trực; stdio đơn giản, ít chi phí vận hành | Khi cần gọi live, có thể chuyển sang SSE/HTTP transport mà giữ nguyên tool interface |
+| ADR-0013 | Market Data Ingestion dùng GitHub Actions Cron làm scheduler | Accepted (Phase 2 planned) | Vercel serverless không phù hợp job dài; GitHub Actions phù hợp scheduled job, có log và retry | Pipeline phải đọc config (ticker list, credentials) từ GitHub Actions secrets và môi trường |
 
 ---
 
@@ -325,6 +358,9 @@ Trust boundary chính:
 | Retrieval Index | Search/RAG layer | Qdrant | Chunk embeddings và payload |
 | Access Control Metadata | Application team | PostgreSQL | User/document scope |
 | Reference Data | Application team | PostgreSQL | Company master, ticker alias |
+| Market Price History (Phase 2 planned) | Market Data pipeline | PostgreSQL + Qdrant | OHLCV EOD từ TCBS API; lưu raw trong PostgreSQL, chunk markdown trong Qdrant |
+| Financial Statements (Phase 2 planned) | Market Data pipeline | PostgreSQL + Qdrant | IS/BS/CF theo quý/năm từ TCBS API; mỗi kỳ là một document version |
+| Ticker Registry (Phase 2 planned) | Market Data pipeline | PostgreSQL | Danh sách ticker cần crawl, trạng thái crawl cuối, mapping company/sector/market |
 
 ### 8.2 Logical & Physical Models
 
@@ -337,20 +373,24 @@ Trust boundary chính:
 - `document_citations`
 - `companies`
 - `ticker_aliases`
+- `users`
 - `user_roles`
 - `user_document_permissions`
 - `index_jobs`
+- `ticker_registry` — danh sách ticker cần crawl, `last_crawled_at`, `last_ohlcv_date`, `last_financial_period`, `crawl_status`
+- `market_crawl_jobs` — log từng lần chạy EOD ingestion: trigger time, tickers attempted/succeeded/failed, errors
 
 **Physical storage:**
 
 - PostgreSQL lưu registry, status, metadata nghiệp vụ, access control và citation mapping metadata.
 - Qdrant lưu embedding của chunk cùng payload cần cho retrieval.
-- Object storage lưu file gốc, preview image/page artifact, OCR intermediate nếu cần.
+- Firebase Storage lưu file gốc, preview image/page artifact, OCR intermediate nếu cần.
 
 **Integration flows:**
 
-- Ingestion worker ghi object storage trước, sau đó parse/chunk/enrich và ghi PostgreSQL + Qdrant.
+- Upload/ingestion ghi Firebase Storage trước (version-aware path), sau đó parse/chunk/enrich và ghi PostgreSQL + Qdrant.
 - Query runtime đọc metadata/access policy từ PostgreSQL và context chunks từ Qdrant.
+- Market Data Ingestion Worker (GitHub Actions EOD) gọi MCP Server tools → transform → ghi PostgreSQL (`ticker_registry`, `market_crawl_jobs`, `documents`, `document_versions`) và Qdrant (chunk embeddings). Không ghi Firebase Storage vì không có file gốc nhị phân — dữ liệu thị trường là structured data từ API.
 
 ### 8.3 Metadata Contract
 
@@ -380,6 +420,17 @@ Trust boundary chính:
 | `ingested_at` | Yes | Thời điểm ingest |
 | `checksum` | Yes | Dùng cho dedupe và integrity |
 | `parse_status` | Yes | indexed, failed, superseded, draft |
+
+**Giá trị `document_type` bổ sung cho Market Data pipeline:**
+
+| document_type | Mô tả | Nguồn |
+| --- | --- | --- |
+| `market_price_history` | OHLCV EOD theo tháng, dạng markdown table | TCBS his-price API |
+| `financial_statement` | Báo cáo tài chính (IS/BS/CF) theo kỳ quý/năm, dạng structured text | TCBS tcanalysis API |
+
+**Chunking strategy cho Market Data:**
+- `market_price_history`: mỗi tháng giao dịch = 1 chunk (~20 rows OHLCV), `section_heading = "OHLCV YYYY-MM"`.
+- `financial_statement`: mỗi statement type (IS/BS/CF) = 1 chunk, `section_heading = "Income Statement Q3-2024"`. Các chỉ tiêu quan trọng (doanh thu, lợi nhuận sau thuế, EPS, ROE) được đặt ở đầu chunk để tăng sparse retrieval precision.
 
 #### 8.3.2 Chunk-level minimum metadata
 
@@ -465,8 +516,8 @@ Trust boundary chính:
 
 | Area | Design | Control Reference |
 | --- | --- | --- |
-| Identity Provider | OIDC/OAuth compatible provider hoặc SSO nội bộ | Security plan pending |
-| Session Management | Short-lived session/JWT with backend validation | Security plan pending |
+| Identity Provider | Firebase Authentication (Email/Password), shared project `actiwell-74477` | Security plan pending |
+| Session Management | Firebase ID token (short-lived) do frontend gửi bearer token; backend verify qua Firebase Admin SDK | Security plan pending |
 | RBAC / ABAC | Role + document sensitivity + source ownership + organization/team scope | RBAC matrix pending |
 
 ### 9.3 Data Protection
@@ -474,7 +525,7 @@ Trust boundary chính:
 | Layer | Control | Notes |
 | --- | --- | --- |
 | In transit | TLS for browser, service-to-service encryption | Bắt buộc cho mọi môi trường ngoài local dev |
-| At rest | Encryption for object storage, PostgreSQL, Qdrant volumes | Managed KMS hoặc equivalent |
+| At rest | Encryption for Firebase Storage (GCS), PostgreSQL, Qdrant volumes | Managed KMS hoặc equivalent |
 | Data minimization | Không lưu query history trong Phase 1; log chỉ giữ technical metadata cần thiết | Giảm rủi ro privacy và retention |
 
 ### 9.4 Logging, Monitoring, & Incident Response
@@ -482,6 +533,8 @@ Trust boundary chính:
 - Log theo request ID, document ID, job ID; không log full corpus tràn lan.
 - MVP chỉ cần các cảnh báo cơ bản cho indexing failure, vector DB unavailability, provider timeout spike.
 - Runbook cần có quy trình revoke access, rotate secrets, tạm dừng provider nếu có data exposure concern.
+- Firebase service account secret chỉ nằm ở backend environment; frontend chỉ dùng public web config `NEXT_PUBLIC_FIREBASE_*`.
+- Gemini API key (nếu bật extraction/synthesis provider) dùng cùng project secret context với Firebase (`actiwell-74477`) và chỉ cấp cho backend runtime.
 
 ### 9.5 Compliance & Privacy
 
@@ -658,12 +711,14 @@ Trust boundary chính:
 - **Pipeline stages:** doc review, lint/test, build, deploy, smoke test.
 - **Migration strategy:** schema migration có versioning cho PostgreSQL; index migration theo batch/rebuild strategy cho Qdrant.
 - **Rollback plan:** rollback app version, giữ backward compatibility ngắn hạn cho metadata schema, reindex selected documents nếu cần.
+- **Market Data Scheduled Workflow (Phase 2 planned):** GitHub Actions workflow `market-data-ingest.yml`, trigger theo EOD ngày giao dịch. Secrets cần thiết: `DATABASE_URL`, `QDRANT_URL`, `QDRANT_API_KEY`, embedding provider key (OpenAI/Gemini tuỳ cấu hình). Workflow tự retry một lần nếu fail; nếu fail lần hai thì ghi `market_crawl_jobs.status = failed` và gửi alert qua GitHub Actions notification.
 
 ### 12.3 Observability & SRE
 
 - **Logging:** structured logs theo request/job/document identifiers.
 - **Metrics:** query latency, retrieval latency, rerank latency, generation latency, indexing latency, token usage, cost per query, citation coverage, error rate, lấy từ application logs và Langfuse traces.
 - **Alerts:** MVP chỉ cần cảnh báo cho index pipeline failure, provider timeout spike, vector store outage.
+- **Storage controls:** preview/download URLs phải là signed URL short-lived; TTL mặc định cấu hình qua `PREVIEW_URL_TTL_MINUTES`.
 
 **MVP note:** Chưa cần Prometheus, Grafana hoặc observability platform riêng ngoài Langfuse và log của ứng dụng. Nếu pilot chứng minh có nhu cầu scale vận hành, các stack này mới được xem xét ở giai đoạn sau.
 
@@ -716,13 +771,15 @@ Trust boundary chính:
 | Phase | Name | Scope Summary |
 | --- | --- | --- |
 | 1 | Query Foundation | ingest, parse/chunk, metadata, hybrid retrieval, metadata filter, rerank, answer with citation, preview nguồn |
-| 2 | Analyst Productivity | compare mode, timeline extraction, risk/thesis extraction, recent query memory nếu thực sự cần |
+| 2 | Analyst Productivity | compare mode, timeline extraction, risk/thesis extraction, market data EOD ingestion (TCBS) để truy vấn OHLCV và financial theo kỳ, recent query memory nếu thực sự cần |
 | 3 | Enterprise Intelligence | watchlist alerts, collaborative workspace, advanced policy, quality dashboard, user analytics |
 
 - **Appendix C:** Change Log
 
 | Version | Date | Author | Summary |
 | --- | --- | --- | --- |
+| 0.5 | 2026-04-12 | OpenAI Codex | Added Phase 2 planned Market Data Ingestion pipeline: TCBS Public API, MCP Server (FastMCP stdio), GitHub Actions EOD scheduler, containers, sequence flow, ADR-0011/0012/0013, data domains, ticker_registry/market_crawl_jobs tables, market_price_history/financial_statement document types and chunking strategy |
+| 0.4 | 2026-04-12 | OpenAI Codex | Added Firebase Auth architecture decision, token trust boundary, and Firebase Storage alignment for uploaded files |
 | 0.3 | 2026-04-12 | OpenAI Codex | Added metadata contract, mandatory versioning, hybrid retrieval/rerank contract, citation preview contract |
 | 0.2 | 2026-04-12 | OpenAI Codex | Initial architecture draft aligned to Phase 1 query-first scope |
 
